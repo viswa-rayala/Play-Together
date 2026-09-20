@@ -1,0 +1,46 @@
+/* PassengerPanel.css — styles for the passenger-only sidebar panel */
+
+.passenger-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Room ID display ────────────────────────────────────────────── */
+.pp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pp-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+}
+
+.pp-room-id {
+  font-family: 'Courier New', monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--primary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  text-align: center;
+  user-select: all;       /* lets the passenger still copy it manually */
+  word-break: break-all;
+}
+
+/* ── Leave button ───────────────────────────────────────────────── */
+.pp-leave-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
