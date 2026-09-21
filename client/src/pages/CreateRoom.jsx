@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createRoomRequest } from '../services/api'
-import socketService from '../services/socket'
 import '../styles/CreateRoom.css'
 
 function generateRoomId() {
@@ -30,7 +29,6 @@ function CreateRoom() {
       const result = await createRoomRequest(id, 'host')
       const createdId = result.roomId
       setRoomId(createdId)
-      socketService.createRoom(createdId)
       setTimeout(() => navigate(`/room/${createdId}?host=true`), 700)
     } catch (err) {
       setError(err.message || 'Unable to create room.')

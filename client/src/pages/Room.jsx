@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
-import socketService from '../services/socket'
+import mediaSocket from '../services/mediaSocket'
 import MediaPlayer     from '../components/MediaPlayer'
 import RoomInfo        from '../components/RoomInfo'
 import AdminControls   from '../components/AdminControls'
@@ -48,52 +48,54 @@ function Room() {
     const onSeek    = ({ position }) => setSeekPosition(position)
     const onMediaSelected = ({ media }) => setMedia(media)
 
-    socketService.on('CONNECTION_STATUS',  onConnStatus)
-    socketService.on('ROOM_STATE',         onRoomState)
-    socketService.on('PARTICIPANT_JOINED', onParticipantJoined)
-    socketService.on('PARTICIPANT_LEFT',   onParticipantLeft)
-    socketService.on('PLAY',               onPlay)
-    socketService.on('PAUSE',              onPause)
-    socketService.on('SEEK',               onSeek)
-    socketService.on('MEDIA_SELECTED',     onMediaSelected)
+    mediaSocket.on('CONNECTION_STATUS',  onConnStatus)
+    mediaSocket.on('ROOM_STATE',         onRoomState)
+    mediaSocket.on('PARTICIPANT_JOINED', onParticipantJoined)
+    mediaSocket.on('PARTICIPANT_LEFT',   onParticipantLeft)
+    mediaSocket.on('PLAY',               onPlay)
+    mediaSocket.on('PAUSE',              onPause)
+    mediaSocket.on('SEEK',               onSeek)
+    mediaSocket.on('MEDIA_SELECTED',     onMediaSelected)
 
     // Connect to room
-    if (isHost) socketService.connect(roomId, true)
-    else        socketService.joinRoom(roomId)
+    mediaSocket.connect(roomId, isHost)
 
     // Cleanup on unmount
     return () => {
-      socketService.off('CONNECTION_STATUS',  onConnStatus)
-      socketService.off('ROOM_STATE',         onRoomState)
-      socketService.off('PARTICIPANT_JOINED', onParticipantJoined)
-      socketService.off('PARTICIPANT_LEFT',   onParticipantLeft)
-      socketService.off('PLAY',               onPlay)
-      socketService.off('PAUSE',              onPause)
-      socketService.off('SEEK',               onSeek)
-      socketService.off('MEDIA_SELECTED',     onMediaSelected)
-      socketService.disconnect()
+      mediaSocket.off('CONNECTION_STATUS',  onConnStatus)
+      mediaSocket.off('ROOM_STATE',         onRoomState)
+      mediaSocket.off('PARTICIPANT_JOINED', onParticipantJoined)
+      mediaSocket.off('PARTICIPANT_LEFT',   onParticipantLeft)
+      mediaSocket.off('PLAY',               onPlay)
+      mediaSocket.off('PAUSE',              onPause)
+      mediaSocket.off('SEEK',               onSeek)
+      mediaSocket.off('MEDIA_SELECTED',     onMediaSelected)
+      mediaSocket.disconnect()
     }
   }, [roomId, isHost])
 
   // ── Host callbacks ─────────────────────────────────────────────────────────────
-  const handleFileSelect = (file) => {
-    // Revoke previous blob URL to free memory
-    if (media?.url?.startsWith('blob:')) URL.revokeObjectURL(media.url)
-    const url = URL.createObjectURL(file)
-    setMedia({ name: file.name, url })
-    socketService.sendMediaSelected(file.name, url)
+  const handleFileSelect = async (file) => {
+    try {
+      const uploadedMedia = await mediaSocket.uploadMedia(file)
+      setMedia(uploadedMedia)
+      mediaSocket.sendMediaSelected(uploadedMedia.name)
+    } catch (error) {
+      setConnStatus('error')
+      console.error('Media upload failed:', error)
+    }
   }
 
-  const handlePlay  = (pos) => { setPlaying(true);  setSeekPosition(pos); socketService.sendPlay(pos) }
-  const handlePause = (pos) => { setPlaying(false); setSeekPosition(pos); socketService.sendPause(pos) }
-  const handleSeek  = (pos) => { setSeekPosition(pos); socketService.sendSeek(pos) }
+  const handlePlay  = (pos) => { setPlaying(true);  setSeekPosition(pos); mediaSocket.sendPlay(pos) }
+  const handlePause = (pos) => { setPlaying(false); setSeekPosition(pos); mediaSocket.sendPause(pos) }
+  const handleSeek  = (pos) => { setSeekPosition(pos); mediaSocket.sendSeek(pos) }
 
   /**
    * handleAddParticipant — wires to socketService.addParticipant.
    * Real WS: ws.send({ type: 'ADD_PARTICIPANT', name })
    */
   const handleAddParticipant = (name) => {
-    socketService.addParticipant(name)
+    // Participant management is owned by the realtime server.
   }
 
   /**
@@ -101,7 +103,7 @@ function Room() {
    * Real WS: ws.send({ type: 'REMOVE_PARTICIPANT', id })
    */
   const handleRemoveParticipant = (id) => {
-    socketService.removeParticipant(id)
+    // Participant management is owned by the realtime server.
   }
 
   /**
@@ -109,7 +111,7 @@ function Room() {
    * Real WS: socketService.leaveRoom() sends LEAVE_ROOM before teardown.
    */
   const handleLeaveRoom = () => {
-    socketService.leaveRoom()
+    mediaSocket.leaveRoom()
     navigate('/')
   }
 

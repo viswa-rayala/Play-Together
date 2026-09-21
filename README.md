@@ -14,6 +14,12 @@ Express API (server/)
         | Supabase service-role connection
         v
 Supabase PostgreSQL (rooms table)
+
+Media browser (public/index.html)
+  |
+  | Socket.IO + media upload/streaming
+  v
+Media server (src/mediaServer.cjs)
 ```
 
 The frontend is in `client/`. The backend is in `server/`.
@@ -21,7 +27,9 @@ The frontend is in `client/`. The backend is in `server/`.
 - The React client renders the UI and calls the backend room API.
 - The Express server validates requests and is the only component allowed to use the Supabase service-role key.
 - Supabase stores active room records.
-- The current playback and participant event layer is still the mock socket service in `client/src/services/socket.js`. It is suitable for UI development but is not shared between different browsers or devices yet.
+- The media service provides a separate Socket.IO/upload flow on port `3000`.
+- The React room UI connects to that service through `client/src/services/mediaSocket.js`.
+- Room IDs are passed into Socket.IO, so playback state and participants are isolated per room.
 
 ## Requirements
 
@@ -69,12 +77,14 @@ URLs:
 
 - Frontend: `http://localhost:5173`
 - Backend health check: `http://localhost:3001/health`
+- Media server: `http://localhost:3000`
 
 To start them separately:
 
 ```bash
 npm --prefix server run dev
 npm --prefix client run dev -- --host 0.0.0.0
+npm run media:dev
 ```
 
 If testing from another device on the same network, open the network URL printed by Vite. The backend listens on all interfaces through the Express server and the frontend automatically uses the current browser hostname unless `VITE_API_URL` is set.
@@ -172,4 +182,4 @@ Before pushing code, verify that `server/.env` is not listed by `git status`. If
 
 ## Next Architecture Step
 
-For real cross-device rooms, replace the mock socket service with a realtime transport. Supabase Realtime can broadcast playback events and participant changes, or the Express server can expose a WebSocket layer. The room API and database schema provide the persistence and room-existence boundary needed for that upgrade.
+The React room UI now uses the media server for uploads and cross-device playback. The older `client/src/services/socket.js` mock service can remain for reference, but it is no longer used by the room page.

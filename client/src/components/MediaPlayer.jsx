@@ -32,6 +32,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const [currentTime, setCurrentTime] = useState(0)
   const [duration,    setDuration]    = useState(0)
   const [isVideo,     setIsVideo]     = useState(true)
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false)
   const prevPlayingRef  = useRef(playing)
   const prevSeekRef     = useRef(seekPosition)
 
@@ -52,9 +53,18 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     prevPlayingRef.current = playing
     const el = mediaRef.current
     if (!el) return
-    if (playing) el.play().catch(() => {})
-    else         el.pause()
+    if (playing) {
+      el.play()
+        .then(() => setAutoplayBlocked(false))
+        .catch(() => setAutoplayBlocked(true))
+    } else {
+      el.pause()
+    }
   }, [playing])
+
+  useEffect(() => {
+    setAutoplayBlocked(false)
+  }, [src])
 
   // Sync seek position from parent (participant view)
   useEffect(() => {
@@ -99,6 +109,12 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     if (el) el.currentTime = pos
     setCurrentTime(pos)
     onSeek?.(pos)
+  }
+
+  const handleParticipantStart = () => {
+    mediaRef.current?.play()
+      .then(() => setAutoplayBlocked(false))
+      .catch(() => setAutoplayBlocked(true))
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -176,6 +192,11 @@ const MediaPlayer = forwardRef(function MediaPlayer(
         {!isHost && (
           <div className="mp-participant-hint">
             👁 Participant view — playback is controlled by the host
+            {autoplayBlocked && (
+              <button className="btn btn-primary" onClick={handleParticipantStart}>
+                ▶ Start playback
+              </button>
+            )}
           </div>
         )}
       </div>

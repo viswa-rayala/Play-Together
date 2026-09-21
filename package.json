@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev -- --host 0.0.0.0\"",
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev -- --host 0.0.0.0\" \"npm run media:dev\"",
+    "media:dev": "node --watch src/mediaServer.cjs",
     "install:all": "npm --prefix client install && npm --prefix server install",
     "build": "npm --prefix client run build",
     "test": "echo \"Error: no test specified\" && exit 1"

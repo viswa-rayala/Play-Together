@@ -7,7 +7,12 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: true,
+        methods: ["GET", "POST"]
+    }
+});
 
 const port = 3000;
 const mediaPath = path.join(__dirname, "../media");
@@ -20,14 +25,30 @@ const upload = multer({
     dest: mediaPath
 });
 
-let hostId = null;
+const hostIds = new Map();
+const roomStates = new Map();
 
-let roomState = {
-    media: "",
-    position: 0,
-    playing: false,
-    updatedAt: Date.now()
-};
+function getRoomState(roomId) {
+    if (!roomStates.has(roomId)) {
+        roomStates.set(roomId, {
+            media: "",
+            position: 0,
+            playing: false,
+            updatedAt: Date.now(),
+            participants: []
+        });
+    }
+
+    return roomStates.get(roomId);
+}
+
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+});
 
 app.use(express.static(path.join(__dirname, "../public")));
 
@@ -180,7 +201,7 @@ function getContentType(fileName) {
     return "application/octet-stream";
 }
 
-function getCurrentPosition() {
+function getCurrentPosition(roomState) {
 
     if (!roomState.playing) {
         return roomState.position;
@@ -195,15 +216,21 @@ function getCurrentPosition() {
 
 io.on("connection", socket => {
 
+    const roomId = String(socket.handshake.auth?.roomId || "default");
+    const roomState = getRoomState(roomId);
+    let hostId = hostIds.get(roomId) || null;
+
+    socket.join(roomId);
+    roomState.participants.push({ id: socket.id, name: "Participant" });
+
     console.log(
-        "Client connected:",
-        socket.id
+        "Client connected:", socket.id, "Room:", roomId
     );
 
-    if (!hostId) {
+    if (!hostId && socket.handshake.auth?.isHost === true) {
 
-        hostId =
-            socket.id;
+        hostId = socket.id;
+        hostIds.set(roomId, hostId);
 
         console.log(
             "Host assigned:",
@@ -215,8 +242,7 @@ io.on("connection", socket => {
         "ROOM_STATE",
         {
             media: roomState.media,
-            position:
-                getCurrentPosition(),
+            position: getCurrentPosition(roomState),
             playing:
                 roomState.playing,
             serverTime:
@@ -225,6 +251,10 @@ io.on("connection", socket => {
                 socket.id === hostId
         }
     );
+
+    io.to(roomId).emit("PARTICIPANT_JOINED", {
+        participants: roomState.participants
+    });
 
     socket.emit(
         "ROLE",
@@ -273,7 +303,7 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
-            socket.broadcast.emit(
+            socket.to(roomId).emit(
                 "MEDIA_SELECTED",
                 {
                     media:
@@ -305,7 +335,7 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
-            socket.broadcast.emit(
+            socket.to(roomId).emit(
                 "PLAY",
                 {
                     position:
@@ -349,7 +379,7 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
-            socket.broadcast.emit(
+            socket.to(roomId).emit(
                 "PAUSE",
                 {
                     position:
@@ -378,7 +408,7 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
-            socket.broadcast.emit(
+            socket.to(roomId).emit(
                 "SEEK",
                 {
                     position:
@@ -405,7 +435,7 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
-            socket.broadcast.emit(
+            socket.to(roomId).emit(
                 "SYNC",
                 {
                     position:
@@ -428,13 +458,21 @@ io.on("connection", socket => {
                 socket.id
             );
 
+            roomState.participants = roomState.participants.filter(
+                participant => participant.id !== socket.id
+            );
+
+            socket.to(roomId).emit("PARTICIPANT_LEFT", {
+                participants: roomState.participants
+            });
+
             if (socket.id === hostId) {
 
                 console.log(
                     "Host disconnected"
                 );
 
-                hostId = null;
+                hostIds.delete(roomId);
 
                 roomState.playing =
                     false;
@@ -448,7 +486,7 @@ io.on("connection", socket => {
                 roomState.updatedAt =
                     Date.now();
 
-                io.emit(
+                io.to(roomId).emit(
                     "HOST_DISCONNECTED"
                 );
             }
