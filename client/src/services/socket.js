@@ -1,179 +1,202 @@
 /**
- * services/socket.js  —  MOCK WebSocket Service
- * ════════════════════════════════════════════════════════════════════════════
- * Simulates a real WebSocket server in-memory so the UI is fully demo-able
- * without a backend.
+ * PLAY TOGETHER — Real Socket.io Service
  *
- * ── HOW TO REPLACE WITH A REAL BACKEND (for Person 2 / Person 3) ──────────
- * 1. Open a real WebSocket:  const ws = new WebSocket('ws://<server>:<port>')
- * 2. In connect():           ws.onopen → emit CONNECTION_STATUS connected
- * 3. In ws.onmessage:        parse JSON → _emit(data.type, data)
- * 4. In sendPlay/Pause/Seek: ws.send(JSON.stringify({ type, ... }))
- * 5. Keep the on() / off() / _emit() wiring exactly as-is.
+ * Connects to the Play Together Socket.io server.
+ * Works on the same WiFi network — participants connect via the host's IP.
  *
- * ── Backend event names (DO NOT RENAME) ──────────────────────────────────
- * JOIN_ROOM, LEAVE_ROOM, ROOM_STATE, MEDIA_SELECTED,
- * PLAY, PAUSE, SEEK, SYNC, PARTICIPANT_JOINED, PARTICIPANT_LEFT,
- * HOST_DISCONNECTED
+ * Event Contract (unchanged from mock):
+ *   Outgoing: JOIN_ROOM, LEAVE_ROOM, MEDIA_SELECTED, PLAY, PAUSE, SEEK
+ *   Incoming: ROOM_STATE, PARTICIPANT_JOINED, PARTICIPANT_LEFT,
+ *             HOST_DISCONNECTED, SYNC, MEDIA_CHUNK, MEDIA_READY
  */
 
-// ── Event Emitter ─────────────────────────────────────────────────────────
-const _listeners = {}
+import { io } from 'socket.io-client'
 
-export function on(event, cb) {
-  if (!_listeners[event]) _listeners[event] = []
-  _listeners[event].push(cb)
-}
+// Connect to the same host that served the page, port 3001.
+// This works both for localhost dev and same-WiFi access (e.g. 192.168.0.207).
+const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`
 
-export function off(event, cb) {
-  if (!_listeners[event]) return
-  _listeners[event] = _listeners[event].filter((fn) => fn !== cb)
-}
+class SocketService {
+  constructor() {
+    this._socket = null
+    this._connected = false
+    this._roomId = null
+    this._isHost = false
+    this._currentFile = null // host keeps the File object for resends
+  }
 
-function _emit(event, data) {
-  ;(_listeners[event] || []).forEach((cb) => cb(data))
-}
+  // ─── Connection ──────────────────────────────────────────
 
-// ── Internal State ────────────────────────────────────────────────────────
-const _default = {
-  roomId:       null,
-  isHost:       false,
-  participants: [],   // Array of { id: string, name: string }
-  media:        null,
-  playback:     { playing: false, position: 0 },
-}
+  connect() {
+    return new Promise((resolve, reject) => {
+      this._socket = io(SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        timeout: 8000,
+      })
 
-let _state   = { ..._default }
-let _timers  = []   // track setTimeout IDs so we can cancel on disconnect
+      const onConnect = () => {
+        this._connected = true
+        cleanup()
+        resolve({ status: 'connected' })
+      }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-function _makeId() {
-  return Math.random().toString(36).substring(2, 7).toUpperCase()
-}
+      const onError = (err) => {
+        this._connected = false
+        cleanup()
+        reject(err)
+      }
 
-// ── Connection ────────────────────────────────────────────────────────────
-export function connect(roomId, isHost) {
-  _clearTimers()
-  _emit('CONNECTION_STATUS', { status: 'connecting' })
+      const cleanup = () => {
+        this._socket.off('connect', onConnect)
+        this._socket.off('connect_error', onError)
+      }
 
-  const t = setTimeout(() => {
-    // Host starts with an empty room; joining participants start as themselves
-    const initList = isHost
-      ? []
-      : [{ id: _makeId(), name: 'You (Guest)' }]
+      this._socket.on('connect', onConnect)
+      this._socket.on('connect_error', onError)
 
-    _state = {
-      roomId, isHost,
-      participants: initList,
-      media:    null,
-      playback: { playing: false, position: 0 },
+      // Listen for host resend requests
+      this._socket.on('REQUEST_MEDIA_RESEND', ({ targetSocketId }) => {
+        if (this._isHost && this._currentFile) {
+          this._sendChunks(this._currentFile, null, targetSocketId)
+        }
+      })
+    })
+  }
+
+  disconnect() {
+    this._socket?.disconnect()
+    this._socket = null
+    this._connected = false
+    this._roomId = null
+    this._currentFile = null
+  }
+
+  get isConnected() {
+    return this._connected
+  }
+
+  // ─── Event Emitter ────────────────────────────────────────
+
+  on(event, callback) {
+    this._socket?.on(event, callback)
+    return () => this.off(event, callback)
+  }
+
+  off(event, callback) {
+    this._socket?.off(event, callback)
+  }
+
+  // ─── Outgoing Events (Frontend → Server) ─────────────────
+
+  emit(event, data = {}) {
+    if (!this._socket) {
+      console.warn('[Socket] Not connected. Cannot emit:', event)
+      return
     }
 
-    _emit('CONNECTION_STATUS', { status: 'connected' })
-    _emit('ROOM_STATE', { ..._state })
+    const roomId = this._roomId
 
-    // ── Mock: simulate 2 named guests joining after a delay ──────────────
-    if (isHost) {
-      const mockGuests = [
-        { id: _makeId(), name: 'Alice' },
-        { id: _makeId(), name: 'Bob'   },
-      ]
-      _timers.push(
-        setTimeout(() => {
-          _state.participants = [..._state.participants, mockGuests[0]]
-          _emit('PARTICIPANT_JOINED', { participants: _state.participants })
-        }, 4000),
-        setTimeout(() => {
-          _state.participants = [..._state.participants, mockGuests[1]]
-          _emit('PARTICIPANT_JOINED', { participants: _state.participants })
-        }, 9000),
-      )
+    switch (event) {
+      case 'JOIN_ROOM':
+        this._roomId = data.roomId
+        this._isHost = data.isHost ?? false
+        this._socket.emit('JOIN_ROOM', { roomId: data.roomId, isHost: data.isHost })
+        break
+
+      case 'LEAVE_ROOM':
+        this._socket.emit('LEAVE_ROOM', { roomId })
+        this._roomId = null
+        this._currentFile = null
+        break
+
+      case 'MEDIA_SELECTED': {
+        // data = { name, url, mimeType, file }
+        // Store file for potential resends; send chunks to all participants
+        if (data.file) {
+          this._currentFile = data.file
+          this._sendChunks(data.file, null, null)
+        }
+        break
+      }
+
+      case 'PLAY':
+        this._socket.emit('PLAY', { roomId, position: data.position })
+        break
+
+      case 'PAUSE':
+        this._socket.emit('PAUSE', { roomId, position: data.position })
+        break
+
+      case 'SEEK':
+        this._socket.emit('SEEK', { roomId, position: data.position, playing: data.playing ?? false })
+        break
+
+      default:
+        console.log('[Socket] emit:', event, data)
     }
-  }, 900)
+  }
 
-  _timers.push(t)
+  // ─── Restore a file reference (after page refresh from IndexedDB) ──
+  // Sets the stored file so REQUEST_MEDIA_RESEND can work, without
+  // re-transmitting to everyone (they already have it from before).
+  restoreFile(file) {
+    this._currentFile = file
+  }
+
+  // ─── Internal: chunk & send a File ────────────────────────
+
+  async _sendChunks(file, onProgress, targetSocketId) {
+    const CHUNK_SIZE = 128 * 1024 // 128 KB per chunk
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+    const roomId = this._roomId
+
+    for (let i = 0; i < totalChunks; i++) {
+      if (!this._socket?.connected) break
+
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      const buffer = await file.slice(start, end).arrayBuffer()
+
+      this._socket.emit('MEDIA_CHUNK', {
+        roomId,
+        chunk: buffer,
+        chunkIndex: i,
+        totalChunks,
+        mimeType: file.type,
+        fileName: file.name,
+        targetSocketId: targetSocketId ?? undefined,
+      })
+
+      onProgress?.(Math.round(((i + 1) / totalChunks) * 100))
+
+      // Small yield to keep UI responsive
+      await new Promise((r) => setTimeout(r, 4))
+    }
+
+    this._socket?.emit('MEDIA_READY', {
+      roomId,
+      fileName: file.name,
+      mimeType: file.type,
+      targetSocketId: targetSocketId ?? undefined,
+    })
+  }
+
+  // ─── Room Utilities ───────────────────────────────────────
+
+  static generateRoomId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    return Array.from({ length: 6 }, () =>
+      chars[Math.floor(Math.random() * chars.length)]
+    ).join('')
+  }
+
+  static validateRoomId(id) {
+    return /^[A-Z0-9]{4,8}$/.test(id?.toUpperCase().trim())
+  }
 }
 
-export function disconnect() {
-  _clearTimers()
-  _state = { ..._default }
-  _emit('CONNECTION_STATUS', { status: 'disconnected' })
-}
-
-/**
- * leaveRoom — signals the server before disconnecting.
- * Real backend: ws.send(JSON.stringify({ type: 'LEAVE_ROOM', roomId: _state.roomId }))
- */
-export function leaveRoom() {
-  _emit('LEAVE_ROOM', { roomId: _state.roomId })
-  disconnect()
-}
-
-function _clearTimers() {
-  _timers.forEach(clearTimeout)
-  _timers = []
-}
-
-// ── Room actions ──────────────────────────────────────────────────────────
-export function createRoom(roomId) { connect(roomId, true) }
-export function joinRoom(roomId)   { connect(roomId, false) }
-
-/**
- * addParticipant — mock add.
- * Real backend: ws.send({ type: 'ADD_PARTICIPANT', name })
- */
-export function addParticipant(name) {
-  const trimmed = name.trim()
-  if (!trimmed) return
-  const newP = { id: _makeId(), name: trimmed }
-  _state.participants = [..._state.participants, newP]
-  _emit('PARTICIPANT_JOINED', { participants: _state.participants })
-}
-
-/**
- * removeParticipant — mock remove.
- * Real backend: ws.send({ type: 'REMOVE_PARTICIPANT', id })
- */
-export function removeParticipant(id) {
-  _state.participants = _state.participants.filter((p) => p.id !== id)
-  _emit('PARTICIPANT_LEFT', { participants: _state.participants })
-}
-
-// ── Playback ──────────────────────────────────────────────────────────────
-export function sendPlay(position) {
-  _state.playback = { playing: true, position }
-  // Real backend: ws.send(JSON.stringify({ type: 'PLAY', position, timestamp: Date.now() }))
-  _emit('PLAY', { type: 'PLAY', position, timestamp: Date.now() })
-}
-
-export function sendPause(position) {
-  _state.playback = { playing: false, position }
-  // Real backend: ws.send(JSON.stringify({ type: 'PAUSE', position }))
-  _emit('PAUSE', { type: 'PAUSE', position })
-}
-
-export function sendSeek(position) {
-  _state.playback = { ..._state.playback, position }
-  // Real backend: ws.send(JSON.stringify({ type: 'SEEK', position }))
-  _emit('SEEK', { type: 'SEEK', position })
-}
-
-export function sendMediaSelected(name, url) {
-  _state.media = { name, url }
-  // Real backend: ws.send(JSON.stringify({ type: 'MEDIA_SELECTED', media: { name, url } }))
-  _emit('MEDIA_SELECTED', { type: 'MEDIA_SELECTED', media: { name, url } })
-}
-
-// ── Utilities ─────────────────────────────────────────────────────────────
-export function getState() { return { ..._state } }
-
-// Default export: single object for easy import everywhere
-const socketService = {
-  on, off, connect, disconnect, leaveRoom,
-  createRoom, joinRoom,
-  addParticipant, removeParticipant,
-  sendPlay, sendPause, sendSeek, sendMediaSelected,
-  getState,
-}
-
+// Singleton instance
+const socketService = new SocketService()
 export default socketService
