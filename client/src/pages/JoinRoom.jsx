@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { validateRoomRequest } from '../services/api'
 import '../styles/JoinRoom.css'
 
 function JoinRoom() {
   const navigate = useNavigate()
   const [roomId, setRoomId] = useState('')
   const [error,  setError]  = useState('')
+  const [joining, setJoining] = useState(false)
 
   const validate = (id) => {
     const v = id.trim().toUpperCase()
@@ -16,12 +18,27 @@ function JoinRoom() {
     return ''
   }
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     const v = roomId.trim().toUpperCase()
     const err = validate(v)
     if (err) { setError(err); return }
+
+    setJoining(true)
     setError('')
-    navigate(`/room/${v}?host=false`)
+
+    try {
+      const result = await validateRoomRequest(v)
+      if (!result.valid) {
+        setError('Room not found or inactive.')
+        setJoining(false)
+        return
+      }
+
+      navigate(`/room/${v}?host=false`)
+    } catch (joinError) {
+      setError(joinError.message || 'Unable to validate room.')
+      setJoining(false)
+    }
   }
 
   const handleChange = (e) => {
@@ -66,8 +83,9 @@ function JoinRoom() {
           id="btn-join-confirm"
           className="btn btn-primary join-cta"
           onClick={handleJoin}
+          disabled={joining}
         >
-          🔗 Join Room
+          {joining ? 'Checking room…' : '🔗 Join Room'}
         </button>
 
       </div>

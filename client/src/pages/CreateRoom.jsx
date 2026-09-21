@@ -1,25 +1,41 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { createRoomRequest } from '../services/api'
 import socketService from '../services/socket'
 import '../styles/CreateRoom.css'
 
-// Generates a random 6-character alphanumeric room ID
 function generateRoomId() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let id = ''
+  for (let i = 0; i < 6; i += 1) {
+    id += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return id
 }
 
 function CreateRoom() {
   const navigate  = useNavigate()
   const [roomId,   setRoomId]   = useState('')
   const [creating, setCreating] = useState(false)
+  const [error,    setError]    = useState('')
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (creating) return
+
     const id = generateRoomId()
-    setRoomId(id)
     setCreating(true)
-    socketService.createRoom(id)         // start mock connection
-    setTimeout(() => navigate(`/room/${id}?host=true`), 1100)
+    setError('')
+
+    try {
+      const result = await createRoomRequest(id, 'host')
+      const createdId = result.roomId
+      setRoomId(createdId)
+      socketService.createRoom(createdId)
+      setTimeout(() => navigate(`/room/${createdId}?host=true`), 700)
+    } catch (err) {
+      setError(err.message || 'Unable to create room.')
+      setCreating(false)
+    }
   }
 
   return (
@@ -39,6 +55,8 @@ function CreateRoom() {
             <span className="preview-id">{roomId}</span>
           </div>
         )}
+
+        {error && <p className="error-msg" role="alert">{error}</p>}
 
         <button
           id="btn-create-confirm"
