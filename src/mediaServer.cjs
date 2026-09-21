@@ -14,7 +14,7 @@ const io = new Server(server, {
     }
 });
 
-const port = 3000;
+const port = Number(process.env.PORT || 3000);
 const mediaPath = path.join(__dirname, "../media");
 
 if (!fs.existsSync(mediaPath)) {

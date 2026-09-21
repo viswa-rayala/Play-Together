@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: play-together-api
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm run start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+  - type: web
+    name: play-together-media
+    env: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm run media:prod
+    envVars:
+      - key: PORT
+        value: 10000

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev -- --host 0.0.0.0\" \"npm run media:dev\"",
     "media:dev": "node --watch src/mediaServer.cjs",
+    "media:prod": "node src/mediaServer.cjs",
+    "server:prod": "npm --prefix server run start",
     "install:all": "npm --prefix client install && npm --prefix server install",
     "build": "npm --prefix client run build",
     "test": "echo \"Error: no test specified\" && exit 1"
