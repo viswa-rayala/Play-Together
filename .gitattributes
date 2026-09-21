@@ -1,0 +1,2 @@
+# Use Git LFS for large media files (if Git LFS is enabled locally)
+media/* filter=lfs diff=lfs merge=lfs -text

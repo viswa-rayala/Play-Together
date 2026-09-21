@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Play Together</title>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+        }
+
+        button {
+            padding: 10px 14px;
+            margin: 5px;
+            font-size: 15px;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        #syncInfo {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f2f2f2;
+        }
+
+        #startButton {
+            display: none;
+            margin-top: 15px;
+        }
+
+        #fileName {
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Play Together</h1>
+
+    <input
+        type="file"
+        id="fileInput"
+        accept=".mp3,.wav,.ogg,.mp4,.webm,audio/*,video/*"
+        hidden
+    >
+
+    <button id="selectButton">
+        Select Media
+    </button>
+
+    <div id="fileName">
+        No media selected
+    </div>
+
+    <br>
+
+    <button id="playButton">
+        Play
+    </button>
+
+    <button id="pauseButton">
+        Pause
+    </button>
+
+    <audio id="player" controls></audio>
+
+    <button id="startButton">
+        Click to Start Synchronized Playback
+    </button>
+
+    <div id="status">
+        Connecting...
+    </div>
+
+    <div id="syncInfo">
+        Role:
+        <span id="role">Connecting...</span>
+        <br>
+
+        Host Position:
+        <span id="hostPosition">0.000</span>
+        <br>
+
+        Local Position:
+        <span id="localPosition">0.000</span>
+        <br>
+
+        Drift:
+        <span id="drift">0.000</span>
+    </div>
+
+    <script>
+
+        const socket = io();
+
+        const player =
+            document.getElementById("player");
+
+        const fileInput =
+            document.getElementById("fileInput");
+
+        const selectButton =
+            document.getElementById("selectButton");
+
+        const fileName =
+            document.getElementById("fileName");
+
+        const playButton =
+            document.getElementById("playButton");
+
+        const pauseButton =
+            document.getElementById("pauseButton");
+
+        const startButton =
+            document.getElementById("startButton");
+
+        const status =
+            document.getElementById("status");
+
+        const role =
+            document.getElementById("role");
+
+        const hostPositionText =
+            document.getElementById("hostPosition");
+
+        const localPositionText =
+            document.getElementById("localPosition");
+
+        const driftText =
+            document.getElementById("drift");
+
+        let isHost = false;
+
+        let suppressPlay = false;
+        let suppressPause = false;
+        let suppressSeek = false;
+
+        let serverOffset = 0;
+
+        let hostPosition = 0;
+        let hostServerTime = Date.now();
+
+        let roomPlaying = false;
+
+        let correcting = false;
+
+        function serverNow() {
+
+            return Date.now() +
+                serverOffset;
+        }
+
+        function estimateHostPosition() {
+
+            if (!roomPlaying) {
+                return hostPosition;
+            }
+
+            const elapsed =
+                (serverNow() -
+                hostServerTime) / 1000;
+
+            return hostPosition +
+                elapsed;
+        }
+
+        function updateDisplay() {
+
+            const hp =
+                estimateHostPosition();
+
+            const lp =
+                player.currentTime || 0;
+
+            const d =
+                hp - lp;
+
+            hostPositionText.textContent =
+                hp.toFixed(3);
+
+            localPositionText.textContent =
+                lp.toFixed(3);
+
+            driftText.textContent =
+                d.toFixed(3);
+        }
+
+        function loadMedia(media) {
+
+            if (!media) {
+                return;
+            }
+
+            const src =
+                "/media/" +
+                encodeURIComponent(media);
+
+            if (
+                player.src !==
+                location.origin + src
+            ) {
+
+                suppressSeek = true;
+
+                player.src = src;
+
+                player.load();
+
+                setTimeout(
+                    () => {
+                        suppressSeek = false;
+                    },
+                    500
+                );
+            }
+        }
+
+        selectButton.addEventListener(
+            "click",
+            () => {
+
+                if (!isHost) {
+                    return;
+                }
+
+                fileInput.click();
+            }
+        );
+
+        fileInput.addEventListener(
+            "change",
+            async () => {
+
+                const file =
+                    fileInput.files[0];
+
+                if (!file) {
+                    return;
+                }
+
+                status.textContent =
+                    "Uploading media...";
+
+                fileName.textContent =
+                    "Selected: " +
+                    file.name;
+
+                const formData =
+                    new FormData();
+
+                formData.append(
+                    "media",
+                    file
+                );
+
+                try {
+
+                    const response =
+                        await fetch(
+                            "/upload",
+                            {
+                                method: "POST",
+                                body: formData
+                            }
+                        );
+
+                    const data =
+                        await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            data.error ||
+                            "Upload failed"
+                        );
+                    }
+
+                    loadMedia(data.media);
+
+                    socket.emit(
+                        "MEDIA_SELECTED",
+                        {
+                            media:
+                                data.media
+                        }
+                    );
+
+                    status.textContent =
+                        "Media selected: " +
+                        data.media;
+
+                } catch (error) {
+
+                    console.log(
+                        "Upload error:",
+                        error
+                    );
+
+                    status.textContent =
+                        "Media upload failed";
+                }
+            }
+        );
+
+        async function hostPlay() {
+
+            if (!isHost) {
+                return;
+            }
+
+            if (!player.src) {
+
+                status.textContent =
+                    "Select media first.";
+
+                return;
+            }
+
+            try {
+
+                suppressPlay = true;
+
+                await player.play();
+
+                suppressPlay = false;
+
+                const position =
+                    player.currentTime || 0;
+
+                roomPlaying = true;
+
+                hostPosition =
+                    position;
+
+                hostServerTime =
+                    serverNow();
+
+                socket.emit(
+                    "PLAY",
+                    {
+                        position:
+                            position
+                    }
+                );
+
+                status.textContent =
+                    "Playing";
+
+            } catch (error) {
+
+                suppressPlay = false;
+
+                console.log(
+                    "Host play error:",
+                    error
+                );
+
+                status.textContent =
+                    "Playback was blocked. Click Play again.";
+            }
+        }
+
+        function hostPause() {
+
+            if (!isHost) {
+                return;
+            }
+
+            const position =
+                player.currentTime || 0;
+
+            suppressPause = true;
+
+            player.pause();
+
+            suppressPause = false;
+
+            roomPlaying = false;
+
+            hostPosition =
+                position;
+
+            hostServerTime =
+                serverNow();
+
+            socket.emit(
+                "PAUSE",
+                {
+                    position:
+                        position
+                }
+            );
+
+            status.textContent =
+                "Paused";
+        }
+
+        playButton.addEventListener(
+            "click",
+            hostPlay
+        );
+
+        pauseButton.addEventListener(
+            "click",
+            hostPause
+        );
+
+        startButton.addEventListener(
+            "click",
+            async () => {
+
+                try {
+
+                    suppressPlay = true;
+
+                    await player.play();
+
+                    suppressPlay = false;
+
+                    startButton.style.display =
+                        "none";
+
+                    status.textContent =
+                        "Playing";
+
+                } catch (error) {
+
+                    suppressPlay = false;
+
+                    console.log(
+                        "Start error:",
+                        error
+                    );
+                }
+            }
+        );
+
+        player.addEventListener(
+            "play",
+            () => {
+
+                if (suppressPlay) {
+                    return;
+                }
+
+                if (!isHost) {
+                    return;
+                }
+
+                const position =
+                    player.currentTime || 0;
+
+                roomPlaying = true;
+
+                hostPosition =
+                    position;
+
+                hostServerTime =
+                    serverNow();
+
+                socket.emit(
+                    "PLAY",
+                    {
+                        position:
+                            position
+                    }
+                );
+
+                status.textContent =
+                    "Playing";
+            }
+        );
+
+        player.addEventListener(
+            "pause",
+            () => {
+
+                if (suppressPause) {
+                    return;
+                }
+
+                if (!isHost) {
+                    return;
+                }
+
+                const position =
+                    player.currentTime || 0;
+
+                roomPlaying = false;
+
+                hostPosition =
+                    position;
+
+                hostServerTime =
+                    serverNow();
+
+                socket.emit(
+                    "PAUSE",
+                    {
+                        position:
+                            position
+                    }
+                );
+
+                status.textContent =
+                    "Paused";
+            }
+        );
+
+        player.addEventListener(
+            "seeked",
+            () => {
+
+                if (suppressSeek) {
+                    return;
+                }
+
+                if (!isHost) {
+                    return;
+                }
+
+                const position =
+                    player.currentTime || 0;
+
+                hostPosition =
+                    position;
+
+                hostServerTime =
+                    serverNow();
+
+                socket.emit(
+                    "SEEK",
+                    {
+                        position:
+                            position
+                    }
+                );
+            }
+        );
+
+        socket.on(
+            "connect",
+            () => {
+
+                console.log(
+                    "Connected:",
+                    socket.id
+                );
+
+                status.textContent =
+                    "Connected";
+
+                socket.emit(
+                    "TIME_REQUEST"
+                );
+            }
+        );
+
+        socket.on(
+            "ROLE",
+            data => {
+
+                isHost =
+                    data.isHost;
+
+                if (isHost) {
+
+                    role.textContent =
+                        "HOST";
+
+                    selectButton.disabled =
+                        false;
+
+                } else {
+
+                    role.textContent =
+                        "PARTICIPANT";
+
+                    selectButton.disabled =
+                        true;
+
+                    playButton.disabled =
+                        true;
+
+                    pauseButton.disabled =
+                        true;
+                }
+            }
+        );
+
+        socket.on(
+            "TIME_RESPONSE",
+            data => {
+
+                serverOffset =
+                    data.serverTime -
+                    Date.now();
+            }
+        );
+
+        socket.on(
+            "MEDIA_SELECTED",
+            data => {
+
+                loadMedia(
+                    data.media
+                );
+
+                fileName.textContent =
+                    "Media: " +
+                    data.media;
+
+                status.textContent =
+                    "Media selected: " +
+                    data.media;
+            }
+        );
+
+        socket.on(
+            "PLAY_CONFIRMED",
+            data => {
+
+                if (!isHost) {
+                    return;
+                }
+
+                roomPlaying = true;
+
+                hostPosition =
+                    data.position;
+
+                hostServerTime =
+                    data.serverTime;
+
+                status.textContent =
+                    "Playing";
+            }
+        );
+
+        socket.on(
+            "PLAY",
+            data => {
+
+                if (isHost) {
+                    return;
+                }
+
+                roomPlaying = true;
+
+                hostPosition =
+                    data.position;
+
+                hostServerTime =
+                    data.serverTime;
+
+                const elapsed =
+                    (serverNow() -
+                    data.serverTime) / 1000;
+
+                const target =
+                    data.position +
+                    elapsed;
+
+                suppressSeek = true;
+
+                player.currentTime =
+                    Math.max(
+                        0,
+                        target
+                    );
+
+                suppressSeek = false;
+
+                suppressPlay = true;
+
+                player.play()
+                    .then(() => {
+
+                        suppressPlay = false;
+
+                        startButton.style.display =
+                            "none";
+
+                        status.textContent =
+                            "Playing";
+
+                    })
+                    .catch(error => {
+
+                        suppressPlay = false;
+
+                        console.log(
+                            "Participant autoplay blocked:",
+                            error
+                        );
+
+                        startButton.style.display =
+                            "block";
+
+                        status.textContent =
+                            "Click Start to play";
+                    });
+            }
+        );
+
+        socket.on(
+            "PAUSE",
+            data => {
+
+                if (isHost) {
+                    return;
+                }
+
+                roomPlaying = false;
+
+                hostPosition =
+                    data.position;
+
+                hostServerTime =
+                    serverNow();
+
+                suppressPause = true;
+
+                player.pause();
+
+                suppressPause = false;
+
+                suppressSeek = true;
+
+                player.currentTime =
+                    Math.max(
+                        0,
+                        data.position
+                    );
+
+                suppressSeek = false;
+
+                status.textContent =
+                    "Paused";
+            }
+        );
+
+        socket.on(
+            "SEEK",
+            data => {
+
+                if (isHost) {
+                    return;
+                }
+
+                hostPosition =
+                    data.position;
+
+                hostServerTime =
+                    serverNow();
+
+                suppressSeek = true;
+
+                player.currentTime =
+                    Math.max(
+                        0,
+                        data.position
+                    );
+
+                suppressSeek = false;
+            }
+        );
+
+        socket.on(
+            "SYNC",
+            data => {
+
+                if (isHost) {
+                    return;
+                }
+
+                hostPosition =
+                    data.position;
+
+                hostServerTime =
+                    data.serverTime;
+
+                roomPlaying =
+                    data.playing;
+            }
+        );
+
+        socket.on(
+            "ROOM_STATE",
+            data => {
+
+                console.log(
+                    "ROOM_STATE:",
+                    data
+                );
+
+                if (data.media) {
+
+                    loadMedia(
+                        data.media
+                    );
+
+                    fileName.textContent =
+                        "Media: " +
+                        data.media;
+                }
+
+                roomPlaying =
+                    data.playing;
+
+                hostPosition =
+                    data.position;
+
+                hostServerTime =
+                    data.serverTime;
+
+                if (!data.playing) {
+
+                    suppressSeek = true;
+
+                    player.currentTime =
+                        Math.max(
+                            0,
+                            data.position
+                        );
+
+                    suppressSeek = false;
+
+                    status.textContent =
+                        "Joined room";
+                }
+
+                if (data.playing) {
+
+                    status.textContent =
+                        "Joined active playback";
+
+                    const start =
+                        () => {
+
+                            const elapsed =
+                                (serverNow() -
+                                data.serverTime) / 1000;
+
+                            const target =
+                                data.position +
+                                elapsed;
+
+                            suppressSeek = true;
+
+                            player.currentTime =
+                                Math.max(
+                                    0,
+                                    target
+                                );
+
+                            suppressSeek = false;
+
+                            suppressPlay = true;
+
+                            player.play()
+                                .then(() => {
+
+                                    suppressPlay =
+                                        false;
+
+                                    startButton.style.display =
+                                        "none";
+
+                                })
+                                .catch(() => {
+
+                                    suppressPlay =
+                                        false;
+
+                                    startButton.style.display =
+                                        "block";
+                                });
+                        };
+
+                    if (
+                        player.readyState >= 1
+                    ) {
+
+                        start();
+
+                    } else {
+
+                        player.addEventListener(
+                            "loadedmetadata",
+                            start,
+                            {
+                                once: true
+                            }
+                        );
+                    }
+                }
+            }
+        );
+
+        socket.on(
+            "HOST_DISCONNECTED",
+            () => {
+
+                roomPlaying = false;
+
+                player.pause();
+
+                status.textContent =
+                    "Host disconnected";
+            }
+        );
+
+        setInterval(
+            () => {
+
+                if (!isHost) {
+                    return;
+                }
+
+                if (!player.src) {
+                    return;
+                }
+
+                if (player.paused) {
+                    return;
+                }
+
+                socket.emit(
+                    "SYNC",
+                    {
+                        position:
+                            player.currentTime,
+
+                        playing:
+                            true
+                    }
+                );
+
+            },
+            1000
+        );
+
+        setInterval(
+            () => {
+
+                updateDisplay();
+
+                if (isHost) {
+                    return;
+                }
+
+                if (!roomPlaying) {
+                    return;
+                }
+
+                if (player.paused) {
+                    return;
+                }
+
+                if (correcting) {
+                    return;
+                }
+
+                const target =
+                    estimateHostPosition();
+
+                const local =
+                    player.currentTime;
+
+                const drift =
+                    target - local;
+
+                if (
+                    Math.abs(drift) < 0.15
+                ) {
+                    return;
+                }
+
+                correcting = true;
+
+                suppressSeek = true;
+
+                player.currentTime =
+                    Math.max(
+                        0,
+                        target
+                    );
+
+                setTimeout(
+                    () => {
+
+                        suppressSeek =
+                            false;
+
+                        correcting =
+                            false;
+
+                    },
+                    200
+                );
+
+            },
+            200
+        );
+
+    </script>
+
+</body>
+</html>
