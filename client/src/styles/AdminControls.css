@@ -1,0 +1,202 @@
+/* AdminControls.css — styles for the host Admin Panel sidebar */
+
+.admin-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Section wrapper ──────────────────────────────────────────── */
+.ac-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ac-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.ac-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.ac-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+
+/* ── Media file picker ────────────────────────────────────────── */
+.ac-pick-btn {
+  width: 100%;
+  font-size: 0.85rem;
+  padding: 9px 14px;
+}
+
+.ac-media-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  animation: ac-fade-in 0.25s ease;
+}
+
+@keyframes ac-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.ac-media-icon { font-size: 1rem; flex-shrink: 0; }
+
+.ac-media-name {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Participant list ─────────────────────────────────────────── */
+.ac-empty-hint {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 12px 0;
+  margin: 0;
+}
+
+.ac-participant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ac-participant-list::-webkit-scrollbar { width: 4px; }
+.ac-participant-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.ac-participant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  animation: ac-fade-in 0.2s ease;
+  transition: border-color 0.15s ease;
+}
+
+.ac-participant-row:hover {
+  border-color: var(--primary-dim, var(--border));
+}
+
+.ac-participant-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Kick / Remove button */
+.ac-kick-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  line-height: 1;
+}
+
+.ac-kick-btn:hover {
+  background: hsl(0 70% 50% / 0.15);
+  border-color: hsl(0 70% 55%);
+  color: hsl(0 70% 60%);
+}
+
+.ac-kick-btn:active {
+  background: hsl(0 70% 50% / 0.3);
+}
+
+/* ── Add participant row ──────────────────────────────────────── */
+.ac-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ac-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ac-add-input::placeholder { color: var(--text-dim); }
+
+.ac-add-input:focus {
+  border-color: var(--primary);
+}
+
+.ac-add-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.ac-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

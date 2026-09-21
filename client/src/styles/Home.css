@@ -1,0 +1,77 @@
+.home-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse at 25% 55%, rgba(99, 102, 241, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 78% 18%, rgba(99, 102, 241, 0.06) 0%, transparent 48%);
+}
+
+.home-content {
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+}
+
+/* Play icon */
+.home-logo {
+  font-size: 3.8rem;
+  display: block;
+  margin-bottom: 18px;
+  filter: drop-shadow(0 0 22px rgba(99, 102, 241, 0.65));
+  animation: logo-pulse 3.5s ease-in-out infinite;
+}
+
+@keyframes logo-pulse {
+  0%, 100% { filter: drop-shadow(0 0 22px rgba(99, 102, 241, 0.65)); }
+  50%       { filter: drop-shadow(0 0 36px rgba(129, 140, 248, 0.90)); }
+}
+
+/* Title */
+.home-title {
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  margin-bottom: 14px;
+  background: linear-gradient(130deg, #f8fafc 0%, #a5b4fc 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Tagline */
+.home-tagline {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  margin-bottom: 44px;
+}
+
+/* Buttons row */
+.home-buttons {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.home-btn {
+  padding: 14px 36px;
+  font-size: 1rem;
+  border-radius: 10px;
+  min-width: 168px;
+}
+
+/* Footer note */
+.home-note {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .home-btn { min-width: 140px; padding: 13px 24px; }
+}
