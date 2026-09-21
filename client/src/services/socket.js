@@ -12,9 +12,10 @@
 
 import { io } from 'socket.io-client'
 
-// Connect to the same host that served the page, port 3001.
-// This works both for localhost dev and same-WiFi access (e.g. 192.168.0.207).
-const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`
+// Connect through the same origin so Vite proxies /socket.io → localhost:3001.
+// This makes it work for ALL devices on WiFi — they hit port 5173 and Vite
+// forwards /socket.io to the Socket.io server. Direct :3001 would be blocked.
+const SERVER_URL = window.location.origin
 
 class SocketService {
   constructor() {
@@ -30,10 +31,12 @@ class SocketService {
   connect() {
     return new Promise((resolve, reject) => {
       this._socket = io(SERVER_URL, {
+        path: '/socket.io',
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 5,
-        timeout: 8000,
+        reconnectionAttempts: 15,
+        reconnectionDelay: 1000,
+        timeout: 10000,
       })
 
       const onConnect = () => {

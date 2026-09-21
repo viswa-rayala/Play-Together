@@ -1,114 +1,170 @@
 import express from 'express'
 import cors from 'cors'
-import dotenv from 'dotenv'
-import { createClient } from '@supabase/supabase-js'
-
-dotenv.config()
+import { createServer } from 'http'
+import { Server } from 'socket.io'
 
 const app = express()
-const port = Number(process.env.PORT || 3001)
-
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
+const httpServer = createServer(app)
+const io = new Server(httpServer, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  maxHttpBufferSize: 200e6,
 })
+
+// ── In-memory rooms ──────────────────────────────────────────
+const rooms = new Map()
+const HOST_GRACE_MS = 10_000
 
 app.use(cors())
 app.use(express.json())
 
-function normalizeRoomId(value) {
-  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
-}
-
-function generateRoomId() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let id = ''
-  for (let i = 0; i < 6; i += 1) {
-    id += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return id
-}
-
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'play-together-server' })
+  res.json({ ok: true, service: 'play-together-server', rooms: rooms.size })
 })
 
-app.post('/api/rooms/create', async (req, res) => {
-  try {
-    let roomId = normalizeRoomId(req.body?.roomId)
-    const hostId = String(req.body?.hostId || 'host')
+io.on('connection', (socket) => {
+  let currentRoom = null
+  let currentIsHost = false
 
-    if (!roomId) {
-      roomId = generateRoomId()
+  socket.on('JOIN_ROOM', ({ roomId, isHost }) => {
+    currentRoom = roomId
+    currentIsHost = isHost
+    socket.join(roomId)
+
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, {
+        hostSocketId: null,
+        participants: new Set(),
+        media: null,
+        playback: { playing: false, position: 0 },
+        hostReconnectTimer: null,
+      })
     }
 
-    if (!/^[A-Z0-9]{4,10}$/.test(roomId)) {
-      return res.status(400).json({ error: 'Invalid room ID format.' })
+    const room = rooms.get(roomId)
+    room.participants.add(socket.id)
+
+    if (isHost) {
+      if (room.hostReconnectTimer) {
+        clearTimeout(room.hostReconnectTimer)
+        room.hostReconnectTimer = null
+        console.log(`[Room ${roomId}] Host reconnected — grace timer cancelled`)
+        socket.to(roomId).emit('HOST_RECONNECTED')
+      }
+      room.hostSocketId = socket.id
     }
 
-    const { data: existing, error: existingError } = await supabase
-      .from('rooms')
-      .select('id')
-      .eq('id', roomId)
-      .maybeSingle()
+    const participantCount = room.hostSocketId
+      ? Math.max(0, room.participants.size - 1)
+      : room.participants.size
 
-    if (existingError) {
-      throw existingError
-    }
-
-    if (existing) {
-      return res.status(409).json({ error: 'Room ID already exists.' })
-    }
-
-    const { error } = await supabase.from('rooms').insert({
-      id: roomId,
-      host_id: hostId,
-      is_active: true,
-      participant_count: 1,
+    socket.emit('ROOM_STATE', {
+      roomId,
+      isHost,
+      participants: participantCount,
+      media: room.media,
+      playback: room.playback,
     })
 
-    if (error) throw error
+    socket.to(roomId).emit('PARTICIPANT_JOINED', { count: participantCount })
 
-    res.status(201).json({ success: true, roomId })
-  } catch (error) {
-    console.error('Create room error:', error)
-    res.status(500).json({ error: 'Failed to create room.' })
-  }
-})
-
-app.get('/api/rooms/:roomId/exists', async (req, res) => {
-  try {
-    const roomId = normalizeRoomId(req.params.roomId)
-
-    if (!/^[A-Z0-9]{4,10}$/.test(roomId)) {
-      return res.status(400).json({ valid: false, error: 'Invalid room ID format.' })
+    if (!isHost && room.media && room.hostSocketId) {
+      io.to(room.hostSocketId).emit('REQUEST_MEDIA_RESEND', {
+        targetSocketId: socket.id,
+      })
     }
+  })
 
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('id, is_active')
-      .eq('id', roomId)
-      .maybeSingle()
+  socket.on('MEDIA_CHUNK', ({ roomId, chunk, chunkIndex, totalChunks, mimeType, fileName, targetSocketId }) => {
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('MEDIA_CHUNK', { chunk, chunkIndex, totalChunks, mimeType, fileName })
+    } else {
+      socket.to(roomId).emit('MEDIA_CHUNK', { chunk, chunkIndex, totalChunks, mimeType, fileName })
+    }
+  })
 
-    if (error) throw error
+  socket.on('MEDIA_READY', ({ roomId, fileName, mimeType, targetSocketId }) => {
+    const room = rooms.get(roomId)
+    if (room) {
+      room.media = { name: fileName, mimeType }
+      room.playback = { playing: false, position: 0 }
+    }
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('MEDIA_READY', { fileName, mimeType })
+    } else {
+      socket.to(roomId).emit('MEDIA_READY', { fileName, mimeType })
+    }
+  })
 
-    res.json({ valid: !!data && data.is_active, exists: !!data })
-  } catch (error) {
-    console.error('Room validation error:', error)
-    res.status(500).json({ valid: false, error: 'Failed to validate room.' })
+  socket.on('PLAY', ({ roomId, position }) => {
+    const room = rooms.get(roomId)
+    if (room) room.playback = { playing: true, position }
+    socket.to(roomId).emit('SYNC', { position, playing: true, timestamp: Date.now() })
+  })
+
+  socket.on('PAUSE', ({ roomId, position }) => {
+    const room = rooms.get(roomId)
+    if (room) room.playback = { playing: false, position }
+    socket.to(roomId).emit('SYNC', { position, playing: false, timestamp: Date.now() })
+  })
+
+  socket.on('SEEK', ({ roomId, position, playing }) => {
+    const room = rooms.get(roomId)
+    if (room) room.playback = { playing: playing ?? false, position }
+    socket.to(roomId).emit('SYNC', { position, playing: playing ?? false, timestamp: Date.now() })
+  })
+
+  socket.on('LEAVE_ROOM', ({ roomId }) => {
+    handleLeave(socket, roomId)
+  })
+
+  socket.on('disconnect', (reason) => {
+    if (!currentRoom) return
+    const room = rooms.get(currentRoom)
+    if (!room) return
+
+    room.participants.delete(socket.id)
+
+    if (currentIsHost || room.hostSocketId === socket.id) {
+      room.hostSocketId = null
+      console.log(`[Room ${currentRoom}] Host disconnected (${reason}). Grace: ${HOST_GRACE_MS}ms`)
+      io.to(currentRoom).emit('HOST_RECONNECTING', { graceMs: HOST_GRACE_MS })
+
+      room.hostReconnectTimer = setTimeout(() => {
+        if (rooms.has(currentRoom)) {
+          console.log(`[Room ${currentRoom}] Grace expired. Ending session.`)
+          io.to(currentRoom).emit('HOST_DISCONNECTED')
+          rooms.delete(currentRoom)
+        }
+      }, HOST_GRACE_MS)
+    } else {
+      if (room.participants.size === 0) {
+        rooms.delete(currentRoom)
+      } else {
+        const count = room.hostSocketId
+          ? Math.max(0, room.participants.size - 1)
+          : room.participants.size
+        socket.to(currentRoom).emit('PARTICIPANT_LEFT', { count })
+      }
+    }
+  })
+
+  function handleLeave(socket, roomId) {
+    socket.leave(roomId)
+    const room = rooms.get(roomId)
+    if (!room) return
+    room.participants.delete(socket.id)
+    if (room.participants.size === 0) {
+      rooms.delete(roomId)
+    } else {
+      const count = room.hostSocketId
+        ? Math.max(0, room.participants.size - 1)
+        : room.participants.size
+      socket.to(roomId).emit('PARTICIPANT_LEFT', { count })
+    }
   }
 })
 
-app.listen(port, () => {
-  console.log(`Play Together server running on http://localhost:${port}`)
+const port = Number(process.env.PORT || 3001)
+httpServer.listen(port, '0.0.0.0', () => {
+  console.log(`✅ Play Together server running on http://0.0.0.0:${port}`)
 })
