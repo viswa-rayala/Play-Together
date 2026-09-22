@@ -221,7 +221,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
         </div>
 
         {/* Play / Pause button — host only */}
-        {isHost && (
+        {isHost && !isFullscreen && (
           <div className="mp-btn-row">
             {playing ? (
               <button id="btn-pause" className="mp-playpause" onClick={handlePauseClick}>
