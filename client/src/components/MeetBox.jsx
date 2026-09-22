@@ -6,7 +6,7 @@ const RTC_CONFIG = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 }
 
-function MeetBox({ participantName }) {
+function MeetBox({ participantName, isHost }) {
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
   const peersRef = useRef(new Map())
@@ -65,6 +65,9 @@ function MeetBox({ participantName }) {
     }
     const onPeerJoined = () => {}
     const onPeerLeft = ({ id }) => removePeer(id)
+    const onMeetEnded = () => {
+      if (joined) leaveMeet()
+    }
     const onSignal = async ({ senderId, senderName, signal }) => {
       if (!joined) return
       const peer = createPeer(senderId, senderName, false)
@@ -95,11 +98,13 @@ function MeetBox({ participantName }) {
     mediaSocket.on('MEET_PEER_JOINED', onPeerJoined)
     mediaSocket.on('MEET_PEER_LEFT', onPeerLeft)
     mediaSocket.on('MEET_SIGNAL', onSignal)
+    mediaSocket.on('MEET_ENDED', onMeetEnded)
     return () => {
       mediaSocket.off('MEET_PEERS', onPeers)
       mediaSocket.off('MEET_PEER_JOINED', onPeerJoined)
       mediaSocket.off('MEET_PEER_LEFT', onPeerLeft)
       mediaSocket.off('MEET_SIGNAL', onSignal)
+      mediaSocket.off('MEET_ENDED', onMeetEnded)
     }
   }, [joined])
 
@@ -125,6 +130,11 @@ function MeetBox({ participantName }) {
     if (localVideoRef.current) localVideoRef.current.srcObject = null
     setRemotePeers([])
     setJoined(false)
+  }
+
+  const endMeet = () => {
+    mediaSocket.sendMeetEnd()
+    leaveMeet()
   }
 
   const toggleTrack = (kind) => {
@@ -163,9 +173,17 @@ function MeetBox({ participantName }) {
             {remotePeers.map((peer) => <RemoteTile key={peer.id} peer={peer} />)}
           </div>
           <div className="meet-controls">
-            <button type="button" onClick={() => toggleTrack('audio')}>{micOn ? 'Mute' : 'Unmute'}</button>
-            <button type="button" onClick={() => toggleTrack('video')}>{cameraOn ? 'Camera off' : 'Camera on'}</button>
-            <button type="button" className="meet-leave" onClick={leaveMeet}>Leave meet</button>
+            <button type="button" className="meet-icon-button" onClick={() => toggleTrack('audio')} aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'} title={micOn ? 'Mute microphone' : 'Unmute microphone'}>
+              {micOn ? '🎤' : '🔇'}
+            </button>
+            <button type="button" className="meet-icon-button" onClick={() => toggleTrack('video')} aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
+              {cameraOn ? '📹' : '🚫'}
+            </button>
+            {isHost ? (
+              <button type="button" className="meet-leave" onClick={endMeet}>End meet</button>
+            ) : (
+              <button type="button" className="meet-leave" onClick={leaveMeet}>Leave meet</button>
+            )}
           </div>
           {error && <small className="meet-error">{error}</small>}
         </>

@@ -238,7 +238,7 @@ function Room() {
               onSeek={handleSeek}
             />
           )}
-            <MeetBox participantName={participantName} />
+            <MeetBox participantName={participantName} isHost={isHost} />
           </div>
         </main>
       </div>

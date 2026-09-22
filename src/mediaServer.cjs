@@ -350,6 +350,12 @@ io.on("connection", socket => {
         });
     });
 
+    socket.on("MEET_END", () => {
+        if (socket.id === hostId) {
+            io.to(roomId).emit("MEET_ENDED");
+        }
+    });
+
     socket.on(
         "MEDIA_SELECTED",
         data => {

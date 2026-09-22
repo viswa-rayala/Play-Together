@@ -66,6 +66,7 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('MEET_PEER_JOINED', (peer) => emit('MEET_PEER_JOINED', peer))
   socket.on('MEET_PEER_LEFT', (peer) => emit('MEET_PEER_LEFT', peer))
   socket.on('MEET_SIGNAL', (data) => emit('MEET_SIGNAL', data))
+  socket.on('MEET_ENDED', () => emit('MEET_ENDED'))
   socket.on('HOST_DISCONNECTED', () => emit('HOST_DISCONNECTED', {}))
 }
 
@@ -119,8 +120,9 @@ export function sendMeetSignal(targetId, signal) {
   socket?.emit('MEET_SIGNAL', { targetId, signal })
 }
 export function sendMeetReady() { socket?.emit('MEET_READY') }
+export function sendMeetEnd() { socket?.emit('MEET_END') }
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,
-  sendPlay, sendPause, sendSeek, sendMediaSelected, sendChatMessage, sendMeetSignal, sendMeetReady,
+  sendPlay, sendPause, sendSeek, sendMediaSelected, sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
 }
