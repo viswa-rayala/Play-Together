@@ -2,7 +2,6 @@ import { forwardRef, useRef, useEffect, useState, useImperativeHandle } from 're
 import '../styles/MediaPlayer.css'
 
 const VIDEO_EXTS = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v']
-
 function getExt(name = '') {
   return name.split('.').pop().toLowerCase()
 }
@@ -33,8 +32,11 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const [duration,    setDuration]    = useState(0)
   const [isVideo,     setIsVideo]     = useState(true)
   const [autoplayBlocked, setAutoplayBlocked] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [accentColor, setAccentColor] = useState('#6366f1')
   const prevPlayingRef  = useRef(playing)
   const prevSeekRef     = useRef(seekPosition)
+  const playerShellRef  = useRef(null)
 
   // Expose helpers to parent via ref
   useImperativeHandle(ref, () => ({
@@ -117,6 +119,29 @@ const MediaPlayer = forwardRef(function MediaPlayer(
       .catch(() => setAutoplayBlocked(true))
   }
 
+  const toggleFullscreen = async () => {
+    const target = playerShellRef.current
+    if (!target) return
+
+    try {
+      if (!document.fullscreenElement) {
+        await target.requestFullscreen()
+        setIsFullscreen(true)
+      } else {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      }
+    } catch {
+      setIsFullscreen(false)
+    }
+  }
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   const fmt = (s) => {
     if (!s || isNaN(s)) return '0:00'
@@ -137,14 +162,24 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   }
 
   return (
-    <div className="media-player">
-      {/* ── Media element ── */}
+    <div className="media-player" ref={playerShellRef} style={{ '--player-accent': accentColor }}>
       {isVideo ? (
-        <video {...sharedMediaProps} />
+        <div className="mp-video-shell">
+          <video {...sharedMediaProps} />
+
+          <button className="mp-fullscreen-btn" onClick={toggleFullscreen} aria-label="Toggle fullscreen">
+            {isFullscreen ? '⤢' : '⤢'}
+          </button>
+        </div>
       ) : (
         <div className="mp-audio-wrapper">
-          <div className="mp-audio-icon">🎵</div>
-          <p className="mp-audio-name">{mediaName}</p>
+          <div className="mp-audio-card">
+            <div className="mp-audio-art">🎵</div>
+            <div className="mp-audio-info">
+              <span className="mp-audio-label">Now Playing</span>
+              <strong>{mediaName || 'Untitled song'}</strong>
+            </div>
+          </div>
           <audio {...sharedMediaProps} />
         </div>
       )}
@@ -171,6 +206,18 @@ const MediaPlayer = forwardRef(function MediaPlayer(
             aria-label="Seek"
           />
           <span className="mp-time">{fmt(duration)}</span>
+        </div>
+
+        <div className="mp-color-row">
+          <label className="mp-color-picker">
+            <span>Accent</span>
+            <input
+              type="color"
+              value={accentColor}
+              onChange={(e) => setAccentColor(e.target.value)}
+              aria-label="Choose player accent color"
+            />
+          </label>
         </div>
 
         {/* Play / Pause button — host only */}
