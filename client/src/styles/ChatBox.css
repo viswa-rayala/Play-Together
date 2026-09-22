@@ -2,7 +2,9 @@
   width: 100%;
   min-width: 0;
   height: 300px;
-  margin: auto 0 0;
+  margin: 28px 0 4px;
+  align-self: flex-end;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
