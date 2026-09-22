@@ -7,6 +7,7 @@ import AdminControls   from '../components/AdminControls'
 import PassengerPanel  from '../components/PassengerPanel'
 import ConnectionStatus from '../components/ConnectionStatus'
 import ChatBox          from '../components/ChatBox'
+import MeetBox          from '../components/MeetBox'
 import '../styles/Room.css'
 
 /**
@@ -211,6 +212,7 @@ function Room() {
 
         {/* ── Player area ── */}
         <main className="room-player">
+          <div className="room-player-content">
           {!media ? (
             <div className="no-media">
               <span className="no-media-icon">{isHost ? '📂' : '⏳'}</span>
@@ -236,6 +238,8 @@ function Room() {
               onSeek={handleSeek}
             />
           )}
+            <MeetBox participantName={participantName} />
+          </div>
         </main>
       </div>
     </div>

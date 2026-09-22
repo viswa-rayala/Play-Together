@@ -279,6 +279,17 @@ io.on("connection", socket => {
         participants: roomState.participants
     });
 
+    socket.emit("MEET_PEERS", {
+        peers: roomState.participants
+            .filter(participant => participant.id !== socket.id)
+            .map(participant => ({ id: participant.id, name: participant.name }))
+    });
+
+    socket.to(roomId).emit("MEET_PEER_JOINED", {
+        id: socket.id,
+        name: participantName
+    });
+
     socket.emit(
         "ROLE",
         {
@@ -318,6 +329,25 @@ io.on("connection", socket => {
         }
 
         io.to(roomId).emit("CHAT_MESSAGE", chatMessage);
+    });
+
+    socket.on("MEET_SIGNAL", data => {
+        const targetId = String(data?.targetId || "");
+        if (!targetId || !data?.signal) return;
+
+        io.to(targetId).emit("MEET_SIGNAL", {
+            senderId: socket.id,
+            senderName: participantName,
+            signal: data.signal
+        });
+    });
+
+    socket.on("MEET_READY", () => {
+        socket.emit("MEET_PEERS", {
+            peers: roomState.participants
+                .filter(participant => participant.id !== socket.id)
+                .map(participant => ({ id: participant.id, name: participant.name }))
+        });
     });
 
     socket.on(
@@ -521,6 +551,7 @@ io.on("connection", socket => {
             socket.to(roomId).emit("PARTICIPANT_LEFT", {
                 participants: roomState.participants
             });
+            socket.to(roomId).emit("MEET_PEER_LEFT", { id: socket.id });
 
             if (socket.id === hostId) {
 

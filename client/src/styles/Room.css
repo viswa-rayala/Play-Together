@@ -70,6 +70,14 @@
   background: var(--bg);
 }
 
+.room-player-content {
+  width: min(100%, 980px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
 /* ── No media placeholder ── */
 .no-media {
   display: flex;
@@ -161,6 +169,10 @@
 
   .room-player .media-player {
     max-width: 100%;
+  }
+
+  .room-player-content {
+    width: 100%;
   }
 }
 

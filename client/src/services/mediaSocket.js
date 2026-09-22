@@ -62,6 +62,10 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('PARTICIPANT_JOINED', (data) => emit('PARTICIPANT_JOINED', data))
   socket.on('PARTICIPANT_LEFT', (data) => emit('PARTICIPANT_LEFT', data))
   socket.on('CHAT_MESSAGE', (message) => emit('CHAT_MESSAGE', message))
+  socket.on('MEET_PEERS', (data) => emit('MEET_PEERS', data))
+  socket.on('MEET_PEER_JOINED', (peer) => emit('MEET_PEER_JOINED', peer))
+  socket.on('MEET_PEER_LEFT', (peer) => emit('MEET_PEER_LEFT', peer))
+  socket.on('MEET_SIGNAL', (data) => emit('MEET_SIGNAL', data))
   socket.on('HOST_DISCONNECTED', () => emit('HOST_DISCONNECTED', {}))
 }
 
@@ -111,8 +115,12 @@ export function sendMediaSelected(name) { socket?.emit('MEDIA_SELECTED', { media
 export function sendChatMessage(message, clientMessageId) {
   socket?.emit('CHAT_MESSAGE', { message, clientMessageId })
 }
+export function sendMeetSignal(targetId, signal) {
+  socket?.emit('MEET_SIGNAL', { targetId, signal })
+}
+export function sendMeetReady() { socket?.emit('MEET_READY') }
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,
-  sendPlay, sendPause, sendSeek, sendMediaSelected, sendChatMessage,
+  sendPlay, sendPause, sendSeek, sendMediaSelected, sendChatMessage, sendMeetSignal, sendMeetReady,
 }
