@@ -15,21 +15,28 @@ function generateRoomId() {
 function CreateRoom() {
   const navigate  = useNavigate()
   const [roomId,   setRoomId]   = useState('')
+  const [hostName, setHostName] = useState('')
   const [creating, setCreating] = useState(false)
   const [error,    setError]    = useState('')
 
   const handleCreate = async () => {
     if (creating) return
 
+    const cleanName = hostName.trim()
+    if (!cleanName) {
+      setError('Please enter your name before creating a room.')
+      return
+    }
+
     const id = generateRoomId()
     setCreating(true)
     setError('')
 
     try {
-      const result = await createRoomRequest(id, 'host')
+      const result = await createRoomRequest(id, cleanName)
       const createdId = result.roomId
       setRoomId(createdId)
-      setTimeout(() => navigate(`/room/${createdId}?host=true`), 700)
+      setTimeout(() => navigate(`/room/${createdId}?host=true&name=${encodeURIComponent(cleanName)}`), 700)
     } catch (err) {
       setError(err.message || 'Unable to create room.')
       setCreating(false)
@@ -46,6 +53,24 @@ function CreateRoom() {
         <p className="create-sub">
           You'll be the <span className="host-tag">Host</span>. Share the Room ID with friends on the same network.
         </p>
+
+        <div className="input-group">
+          <label htmlFor="host-name-input">Your Name</label>
+          <input
+            id="host-name-input"
+            type="text"
+            className={`room-id-input ${error ? 'input-error' : ''}`}
+            placeholder="e.g. Alex"
+            value={hostName}
+            maxLength={30}
+            onChange={(e) => {
+              setHostName(e.target.value)
+              if (error) setError('')
+            }}
+            autoComplete="name"
+            spellCheck={false}
+          />
+        </div>
 
         {roomId && (
           <div className="room-id-preview" aria-live="polite">
