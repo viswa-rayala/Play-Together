@@ -14,6 +14,7 @@ function MeetBox({ participantName, isHost }) {
   const [joined, setJoined] = useState(false)
   const [cameraOn, setCameraOn] = useState(true)
   const [micOn, setMicOn] = useState(true)
+  const [facingMode, setFacingMode] = useState('user')
   const [remotePeers, setRemotePeers] = useState([])
   const [error, setError] = useState('')
 
@@ -57,6 +58,13 @@ function MeetBox({ participantName, isHost }) {
     }
     return peer
   }
+
+  useEffect(() => {
+    if (joined && localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current
+      localVideoRef.current.play().catch(() => {})
+    }
+  }, [joined])
 
   useEffect(() => {
     const onPeers = ({ peers }) => {
@@ -111,9 +119,11 @@ function MeetBox({ participantName, isHost }) {
   const joinMeet = async () => {
     setError('')
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: true,
+      })
       localStreamRef.current = stream
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream
       setJoined(true)
       mediaSocket.sendMeetReady()
     } catch {
@@ -143,6 +153,38 @@ function MeetBox({ participantName, isHost }) {
     track.enabled = !track.enabled
     if (kind === 'video') setCameraOn(track.enabled)
     else setMicOn(track.enabled)
+  }
+
+  const switchCamera = async () => {
+    const currentStream = localStreamRef.current
+    if (!currentStream) return
+
+    const nextFacingMode = facingMode === 'user' ? 'environment' : 'user'
+    try {
+      const nextStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: nextFacingMode } },
+        audio: false,
+      })
+      const nextTrack = nextStream.getVideoTracks()[0]
+      const oldTrack = currentStream.getVideoTracks()[0]
+      if (!nextTrack) return
+
+      currentStream.removeTrack(oldTrack)
+      currentStream.addTrack(nextTrack)
+      oldTrack?.stop()
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = currentStream
+        localVideoRef.current.play().catch(() => {})
+      }
+      peersRef.current.forEach((peer) => {
+        const sender = peer.getSenders().find((item) => item.track?.kind === 'video')
+        sender?.replaceTrack(nextTrack)
+      })
+      setFacingMode(nextFacingMode)
+      setCameraOn(true)
+    } catch {
+      setError('The other camera is not available on this device.')
+    }
   }
 
   useEffect(() => () => leaveMeet(), [])
@@ -178,6 +220,9 @@ function MeetBox({ participantName, isHost }) {
             </button>
             <button type="button" className="meet-icon-button" onClick={() => toggleTrack('video')} aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
               {cameraOn ? '📹' : '🚫'}
+            </button>
+            <button type="button" className="meet-icon-button" onClick={switchCamera} aria-label="Switch front and back camera" title="Switch front and back camera">
+              🔄
             </button>
             {isHost ? (
               <button type="button" className="meet-leave" onClick={endMeet}>End meet</button>
