@@ -71,8 +71,7 @@ export default function ConnectionStatus({
               height: '100%',
               borderRadius: '50%',
               background: color,
-              opacity: 0.3,
-              animation: 'ping 2s ease-out infinite',
+              opacity: 0.25,
             }}
           />
         )}
@@ -84,7 +83,6 @@ export default function ConnectionStatus({
             borderRadius: '50%',
             background: color,
             boxShadow: `0 0 8px ${glow}`,
-            animation: pulse ? 'pulse-dot 2s ease-in-out infinite' : 'none',
             flexShrink: 0,
           }}
         />

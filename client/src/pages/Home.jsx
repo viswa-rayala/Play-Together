@@ -1,78 +1,12 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Wifi, Play, Users, Share2, Monitor, Smartphone, Tablet, ArrowRight, ChevronDown } from 'lucide-react';
-import FrameSequence from '../components/FrameSequence';
-
-/* ─── Particle Background ─────────────────── */
-function ParticleField({ count = 40 }) {
-  const particles = Array.from({ length: count }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 2 + 1,
-    duration: Math.random() * 8 + 6,
-    delay: Math.random() * 6,
-    opacity: Math.random() * 0.4 + 0.1,
-  }));
-
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        inset: 0,
-        overflow: 'hidden',
-        pointerEvents: 'none',
-      }}
-    >
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          style={{
-            position: 'absolute',
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            borderRadius: '50%',
-            background: p.id % 3 === 0 ? 'var(--accent-blue)' : p.id % 3 === 1 ? 'var(--accent-purple)' : 'var(--accent-cyan)',
-            opacity: p.opacity,
-            animation: `float ${p.duration}s ease-in-out ${p.delay}s infinite`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+import { Wifi, Play, Users, Share2, Monitor, Smartphone, Tablet, ArrowRight, ChevronDown, Volume2, SkipForward, Pause } from 'lucide-react';
 
 /* ─── How It Works Step ───────────────────── */
 function HowItWorksStep({ icon: Icon, title, desc, step, color, isLast }) {
-  const [visible, setVisible] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
-      { threshold: 0.3 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <div ref={ref} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '16px',
-          opacity: visible ? 1 : 0,
-          transform: visible ? 'translateY(0)' : 'translateY(30px)',
-          transition: `opacity 600ms ease, transform 600ms ease`,
-          transitionDelay: `${step * 100}ms`,
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
         {/* Icon circle */}
         <div
           style={{
@@ -171,13 +105,13 @@ function NetworkSVG() {
 
       {/* Connection lines — host to left phone */}
       <path d="M220 200 Q310 160 390 200" stroke="url(#lineGrad)" strokeWidth="1.5" fill="none" filter="url(#glow)"
-        style={{ animation: 'network-pulse 3s ease-in-out 0s infinite' }} strokeDasharray="300" strokeDashoffset="300" />
+        style={{ animation: 'none' }} strokeDasharray="300" strokeDashoffset="300" />
       {/* host to right tablet */}
       <path d="M410 200 Q500 160 590 200" stroke="url(#lineGrad)" strokeWidth="1.5" fill="none" filter="url(#glow)"
-        style={{ animation: 'network-pulse 3s ease-in-out 0.5s infinite' }} strokeDasharray="300" strokeDashoffset="300" />
+        style={{ animation: 'none' }} strokeDasharray="300" strokeDashoffset="0" />
       {/* host to bottom-left phone */}
       <path d="M200 240 Q310 280 390 210" stroke="url(#lineGrad)" strokeWidth="1" fill="none" filter="url(#glow)"
-        style={{ animation: 'network-pulse 3s ease-in-out 1s infinite' }} strokeDasharray="300" strokeDashoffset="300" />
+        style={{ animation: 'none' }} strokeDasharray="300" strokeDashoffset="0" />
 
       {/* ── Host Laptop (center) ── */}
       <g transform="translate(340, 140)">
@@ -193,9 +127,9 @@ function NetworkSVG() {
         {/* Label */}
         <text x="60" y="108" textAnchor="middle" fill="#60a5fa" fontSize="10" fontFamily="var(--font-heading)" fontWeight="600">HOST</text>
         {/* WiFi glow dot */}
-        <circle cx="60" cy="-12" r="4" fill="#06b6d4" style={{ animation: 'pulse-dot 2s ease-in-out infinite' }} filter="url(#glow)" />
+        <circle cx="60" cy="-12" r="4" fill="#06b6d4" filter="url(#glow)" />
         <circle cx="60" cy="-12" r="8" fill="none" stroke="#06b6d4" strokeWidth="1" opacity="0.4"
-          style={{ animation: 'ping 2s ease-out infinite' }} />
+          />
       </g>
 
       {/* ── Left Phone ── */}
@@ -242,28 +176,8 @@ function NetworkSVG() {
 
 /* ─── Section Observer ────────────────────── */
 function FadeSection({ children, delay = 0, className = '' }) {
-  const [visible, setVisible] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
-      { threshold: 0.15 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(32px)',
-        transition: `opacity 700ms ease ${delay}ms, transform 700ms ease ${delay}ms`,
-      }}
-    >
+    <div className={className}>
       {children}
     </div>
   );
@@ -315,8 +229,6 @@ export default function Home() {
           }}
         />
 
-        {/* Particles */}
-        <ParticleField count={35} />
 
         {/* Content */}
         <div className="pt-container" style={{ position: 'relative', zIndex: 2, textAlign: 'center' }}>
@@ -333,7 +245,7 @@ export default function Home() {
               padding: '6px 16px 6px 10px',
               marginBottom: '32px',
               backdropFilter: 'blur(8px)',
-              animation: 'fade-in 800ms ease 200ms both',
+              animation: 'none',
             }}
             role="status"
             aria-label="Local network ready"
@@ -345,7 +257,6 @@ export default function Home() {
                 borderRadius: '50%',
                 background: 'var(--accent-cyan)',
                 boxShadow: '0 0 8px var(--accent-cyan)',
-                animation: 'pulse-dot 2s ease-in-out infinite',
                 flexShrink: 0,
               }}
             />
@@ -360,7 +271,6 @@ export default function Home() {
             className="heading-xl"
             style={{
               marginBottom: '16px',
-              animation: 'slide-up 800ms ease 300ms both',
             }}
           >
             PLAY{' '}
@@ -375,7 +285,6 @@ export default function Home() {
               fontWeight: 500,
               color: 'var(--text-secondary)',
               marginBottom: '16px',
-              animation: 'slide-up 800ms ease 400ms both',
               letterSpacing: '-0.3px',
             }}
           >
@@ -389,7 +298,6 @@ export default function Home() {
               maxWidth: '480px',
               margin: '0 auto 48px',
               lineHeight: 1.7,
-              animation: 'slide-up 800ms ease 500ms both',
             }}
           >
             One room. Multiple devices. One synchronized experience.
@@ -403,7 +311,6 @@ export default function Home() {
               gap: '16px',
               justifyContent: 'center',
               marginBottom: '80px',
-              animation: 'slide-up 800ms ease 600ms both',
             }}
           >
             <Link
@@ -426,36 +333,159 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Frame Sequence — Hero Visual */}
+          {/* ── Hero App Mockup ── */}
           <div
             style={{
-              animation: 'slide-up 1000ms ease 700ms both',
               position: 'relative',
+              width: '100%',
+              maxWidth: '860px',
+              margin: '0 auto',
+              background: 'linear-gradient(135deg, rgba(13,18,32,0.95), rgba(17,24,39,0.98))',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 'var(--radius-xl)',
+              boxShadow: '0 40px 120px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+              overflow: 'hidden',
             }}
+            role="img"
+            aria-label="Play Together app preview showing synchronized playback across devices"
           >
-            <div
-              style={{
-                position: 'absolute',
-                inset: '-30px',
-                background: 'radial-gradient(ellipse at center, rgba(59,130,246,0.15) 0%, transparent 70%)',
-                pointerEvents: 'none',
-                zIndex: -1,
-              }}
-              aria-hidden="true"
-            />
-            <FrameSequence
-              triggerOnScroll={false}
-              loop={true}
-              autoPlay={true}
-              style={{
-                width: '100%',
-                maxWidth: '900px',
-                margin: '0 auto',
-                borderRadius: 'var(--radius-xl)',
-                overflow: 'hidden',
-                boxShadow: '0 40px 120px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05)',
-              }}
-            />
+            {/* Window chrome */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '14px 20px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(8,12,20,0.6)',
+            }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57', display: 'block' }} />
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#febc2e', display: 'block' }} />
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840', display: 'block' }} />
+              <span style={{ flex: 1, textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.2)', fontFamily: 'var(--font-mono)', letterSpacing: '0.5px' }}>play-together · Room XKCD42</span>
+            </div>
+
+            {/* App body */}
+            <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '340px' }}>
+
+              {/* Sidebar */}
+              <div style={{
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+                padding: '20px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                background: 'rgba(8,12,20,0.4)',
+              }}>
+                <p style={{ fontSize: '10px', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Room Info</p>
+
+                {/* Room ID */}
+                <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+                  <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '1px' }}>ROOM ID</p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 700, color: 'var(--accent-blue-bright)', letterSpacing: '3px' }}>XKCD42</p>
+                </div>
+
+                {/* Devices */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <p style={{ fontSize: '10px', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '2px' }}>Connected</p>
+                  {[
+                    { label: 'Laptop (Host)', icon: '💻', color: '#60a5fa' },
+                    { label: 'Phone', icon: '📱', color: '#a78bfa' },
+                    { label: 'Tablet', icon: '📟', color: '#06b6d4' },
+                  ].map(d => (
+                    <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span style={{ fontSize: '14px' }}>{d.icon}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>{d.label}</span>
+                      <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: d.color, boxShadow: `0 0 6px ${d.color}` }} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Sync status */}
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', background: 'rgba(6,182,212,0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(6,182,212,0.15)' }}>
+                  <Wifi size={12} color="var(--accent-cyan)" />
+                  <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', fontWeight: 600, letterSpacing: '0.5px' }}>IN SYNC</span>
+                </div>
+              </div>
+
+              {/* Player area */}
+              <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                {/* Video thumbnail */}
+                <div style={{
+                  flex: 1,
+                  background: 'linear-gradient(135deg, #0d1220, #111827)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '180px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}>
+                  {/* Gradient cinematic bg */}
+                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 70% at 50% 40%, rgba(59,130,246,0.09) 0%, transparent 70%)' }} />
+                  {/* Faux film grain lines */}
+                  {[20, 50, 80].map(y => (
+                    <div key={y} style={{ position: 'absolute', left: 0, right: 0, top: `${y}%`, height: '1px', background: 'rgba(255,255,255,0.02)' }} />
+                  ))}
+                  {/* Play button */}
+                  <div style={{
+                    width: '52px', height: '52px',
+                    borderRadius: '50%',
+                    background: 'rgba(59,130,246,0.25)',
+                    border: '2px solid rgba(59,130,246,0.5)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 0 30px rgba(59,130,246,0.3)',
+                    position: 'relative', zIndex: 1,
+                  }}>
+                    <Pause size={20} color="#60a5fa" fill="#60a5fa" />
+                  </div>
+                  {/* File name */}
+                  <span style={{ position: 'absolute', bottom: '10px', left: '14px', fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)' }}>movie_night.mp4</span>
+                  {/* Time */}
+                  <span style={{ position: 'absolute', bottom: '10px', right: '14px', fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)' }}>18:34 / 1:52:10</span>
+                </div>
+
+                {/* Seek bar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.08)', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ width: '16%', height: '100%', background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-purple))', borderRadius: '2px' }} />
+                  </div>
+                  {/* Controls row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Pause size={16} color="white" fill="white" />
+                      <SkipForward size={14} color="rgba(255,255,255,0.5)" />
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)' }}>18:34 / 1:52:10</span>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Volume2 size={13} color="rgba(255,255,255,0.4)" />
+                      <div style={{ width: '50px', height: '3px', borderRadius: '2px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                        <div style={{ width: '70%', height: '100%', background: 'rgba(255,255,255,0.5)', borderRadius: '2px' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom sync bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 20px',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(6,182,212,0.04)',
+            }}>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                {['💻 Host', '📱 +0ms', '📟 +2ms'].map(d => (
+                  <span key={d} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)' }}>{d}</span>
+                ))}
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>● LIVE SYNC</span>
+            </div>
           </div>
         </div>
 
@@ -471,11 +501,11 @@ export default function Home() {
             flexDirection: 'column',
             alignItems: 'center',
             gap: '6px',
-            animation: 'fade-in 1s ease 1.5s both',
+            animation: 'none',
           }}
         >
           <span style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '2px' }}>SCROLL</span>
-          <ChevronDown size={16} color="var(--text-faint)" style={{ animation: 'float 2s ease-in-out infinite' }} />
+          <ChevronDown size={16} color="var(--text-faint)" />
         </div>
       </section>
 
@@ -735,7 +765,7 @@ export default function Home() {
                   gap: '24px',
                   position: 'relative',
                   overflow: 'hidden',
-                  transition: 'all 300ms ease',
+                  transition: 'none',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)';
@@ -788,7 +818,7 @@ export default function Home() {
                   gap: '24px',
                   position: 'relative',
                   overflow: 'hidden',
-                  transition: 'all 300ms ease',
+                  transition: 'none',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(139,92,246,0.4)';

@@ -108,7 +108,6 @@ export default function JoinRoom() {
           zIndex: 1,
           width: '100%',
           maxWidth: '480px',
-          animation: 'slide-up 600ms ease both',
         }}
       >
         {/* Top icon */}
@@ -125,7 +124,6 @@ export default function JoinRoom() {
               justifyContent: 'center',
               margin: '0 auto 24px',
               boxShadow: '0 0 40px rgba(139,92,246,0.2)',
-              animation: 'pulse-glow 3s ease-in-out infinite',
             }}
           >
             <Users size={34} color="var(--accent-purple-bright)" />
@@ -141,10 +139,6 @@ export default function JoinRoom() {
         {/* Join card */}
         <div
           className="card card-elevated"
-          style={{
-            animation: shake ? 'none' : undefined,
-            transform: shake ? 'translateX(0)' : undefined,
-          }}
         >
           <div
             style={{
@@ -179,9 +173,7 @@ export default function JoinRoom() {
                 aria-describedby={error ? 'room-id-error' : undefined}
                 aria-invalid={!!error}
                 style={{
-                  animation: shake
-                    ? 'shake 400ms ease'
-                    : undefined,
+                  borderColor: shake ? '#ef4444' : undefined,
                 }}
               />
               {error && (
@@ -239,7 +231,6 @@ export default function JoinRoom() {
                       border: '2px solid rgba(255,255,255,0.3)',
                       borderTopColor: '#fff',
                       borderRadius: '50%',
-                      animation: 'rotate-slow 0.8s linear infinite',
                     }}
                   />
                   Connecting…
@@ -268,15 +259,6 @@ export default function JoinRoom() {
         </div>
       </div>
 
-      <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          20%       { transform: translateX(-8px); }
-          40%       { transform: translateX(8px); }
-          60%       { transform: translateX(-6px); }
-          80%       { transform: translateX(6px); }
-        }
-      `}</style>
     </div>
   );
 }

@@ -285,7 +285,6 @@ const MediaPlayer = forwardRef(function MediaPlayer(
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 0 60px rgba(59,130,246,0.3)',
-              animation: isPlaying ? 'pulse-glow 2s ease-in-out infinite' : 'none',
             }}
           >
             <Music size={48} color="white" />
@@ -333,8 +332,8 @@ const MediaPlayer = forwardRef(function MediaPlayer(
           background: isAudio
             ? 'transparent'
             : 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
-          opacity: isAudio ? 1 : (showControls ? 1 : 0),
-          transition: 'opacity 300ms ease',
+          opacity: isAudio ? 1 : showControls ? 1 : 0,
+          transition: 'none',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
@@ -403,10 +402,9 @@ const MediaPlayer = forwardRef(function MediaPlayer(
                 display: 'flex',
                 alignItems: 'center',
                 opacity: duration ? 1 : 0.4,
-                transition: 'transform 150ms ease',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = duration ? '1' : '0.4'}
               aria-label={isPlaying ? 'Pause' : 'Play'}
               id="media-player-play-btn"
             >

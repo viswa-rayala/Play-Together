@@ -47,6 +47,9 @@ export default function Room() {
 
   // Host: restoring from IndexedDB after refresh
   const [restoring, setRestoring] = useState(false);
+  // Host: sending progress to participants
+  const [sending, setSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState(0);
 
   // Throttle time saves to IndexedDB (every 5s)
   const lastSaveTimeRef = useRef(0);
@@ -127,9 +130,14 @@ export default function Room() {
       // ── ROOM_STATE ─────────────────────────────────────────
       const unsubState = socketService.on('ROOM_STATE', (state) => {
         setParticipants(state.participants ?? 0);
-        setHostReconnecting(false); // Host is back / we just joined
+        setHostReconnecting(false);
         clearInterval(countdownRef.current);
         if (state.media && !isHost) {
+          // Reset chunk accumulators so we start fresh for this resend
+          chunksRef.current = {};
+          totalChunksRef.current = 0;
+          receivedCountRef.current = 0;
+          setReceiveProgress(0);
           setReceiving(true);
         }
         if (state.playback) {
@@ -193,7 +201,8 @@ export default function Room() {
       const unsubChunk = socketService.on(
         'MEDIA_CHUNK',
         ({ chunk, chunkIndex, totalChunks, mimeType, fileName }) => {
-          if (!receiving && receivedCountRef.current === 0) {
+          // Always accept chunks — avoid stale closure on `receiving` state
+          if (receivedCountRef.current === 0) {
             setReceiving(true);
           }
           totalChunksRef.current = totalChunks;
@@ -259,8 +268,18 @@ export default function Room() {
     setSyncPosition(0);
     // Persist to IndexedDB so a page refresh restores the file
     if (file) saveMediaFile(roomId, file, 0);
-    // Send file chunks to all participants via server
-    socketService.emit('MEDIA_SELECTED', { name, url, mimeType, file });
+    // Send file chunks to all participants with progress tracking
+    if (file) {
+      setSending(true);
+      setSendProgress(0);
+      socketService.emit('MEDIA_SELECTED', {
+        name, url, mimeType, file,
+        onProgress: (pct) => {
+          setSendProgress(pct);
+          if (pct >= 100) setSending(false);
+        },
+      });
+    }
   };
 
   const handleLeave = () => {
@@ -439,6 +458,18 @@ export default function Room() {
                   onMediaSelect={handleMediaSelect}
                   mediaName={media?.name}
                 />
+                {/* Sending progress */}
+                {sending && (
+                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Sending to participants…</span>
+                      <span style={{ fontSize: '12px', color: 'var(--accent-blue-bright)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{sendProgress}%</span>
+                    </div>
+                    <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: `${sendProgress}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-purple))', borderRadius: '2px' }} />
+                    </div>
+                  </div>
+                )}
               </div>
             </aside>
           )}
@@ -493,7 +524,7 @@ export default function Room() {
                         width: `${(reconnectCountdown / 10) * 100}%`,
                         background: 'linear-gradient(90deg, #f59e0b, #fbbf24)',
                         borderRadius: '2px',
-                        transition: 'width 900ms linear',
+                        transition: 'none',
                       }}
                     />
                   </div>
@@ -523,7 +554,7 @@ export default function Room() {
                   <Loader2
                     size={16}
                     color="var(--accent-blue-bright)"
-                    style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}
+                    style={{ flexShrink: 0 }}
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -543,7 +574,7 @@ export default function Room() {
                           width: `${receiveProgress}%`,
                           background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-cyan))',
                           borderRadius: '2px',
-                          transition: 'width 200ms ease',
+                          transition: 'none',
                         }}
                       />
                     </div>
@@ -579,7 +610,7 @@ export default function Room() {
                   padding: '14px 20px',
                   background: isPlaying ? 'rgba(6,182,212,0.06)' : 'var(--bg-card)',
                   borderColor: isPlaying ? 'rgba(6,182,212,0.2)' : 'var(--border-subtle)',
-                  transition: 'all 400ms ease',
+                  transition: 'none',
                 }}
                 aria-live="polite"
                 aria-label={`Playback status: ${isPlaying ? 'playing' : 'paused'}`}
@@ -591,7 +622,6 @@ export default function Room() {
                     borderRadius: '50%',
                     background: isPlaying ? 'var(--accent-cyan)' : 'var(--text-faint)',
                     boxShadow: isPlaying ? '0 0 8px var(--accent-cyan)' : 'none',
-                    animation: isPlaying ? 'pulse-dot 1.5s ease-in-out infinite' : 'none',
                     flexShrink: 0,
                   }}
                 />
@@ -609,10 +639,6 @@ export default function Room() {
           .room-grid {
             grid-template-columns: 1fr !important;
           }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

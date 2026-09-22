@@ -184,7 +184,6 @@ export default function HostControls({
           background: var(--accent-blue-bright);
           cursor: pointer;
           box-shadow: 0 0 6px rgba(59,130,246,0.6);
-          transition: transform 150ms ease;
         }
         input[type="range"]::-webkit-slider-thumb:hover {
           transform: scale(1.3);

@@ -248,7 +248,6 @@ export default function FrameSequence({
               border: '2px solid var(--border-subtle)',
               borderTopColor: 'var(--accent-blue)',
               borderRadius: '50%',
-              animation: 'rotate-slow 0.9s linear infinite',
             }}
           />
         </div>

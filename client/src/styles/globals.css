@@ -36,7 +36,6 @@
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  transition: all var(--duration-base) var(--ease-out);
   position: relative;
   overflow: hidden;
   white-space: nowrap;
@@ -49,7 +48,6 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity var(--duration-base) var(--ease-out);
   border-radius: inherit;
 }
 
@@ -59,7 +57,7 @@
   background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
   color: #fff;
   border-color: rgba(139, 92, 246, 0.3);
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3), 0 0 0 0 rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
 }
 
 .btn-primary::before {
@@ -67,12 +65,12 @@
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(59, 130, 246, 0.5), 0 0 0 0 rgba(59, 130, 246, 0.4);
+  box-shadow: 0 6px 28px rgba(59, 130, 246, 0.5);
+  filter: brightness(1.08);
 }
 
 .btn-primary:active {
-  transform: translateY(0);
+  filter: brightness(0.95);
 }
 
 .btn-secondary {
@@ -83,10 +81,9 @@
 }
 
 .btn-secondary:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.08);
   border-color: var(--border-accent);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
 
 .btn-ghost {
@@ -107,8 +104,8 @@
 }
 
 .btn-danger:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  filter: brightness(1.08);
 }
 
 .btn-sm {
@@ -176,7 +173,6 @@
   font-size: 15px;
   color: var(--text-primary);
   outline: none;
-  transition: all var(--duration-base) var(--ease-out);
 }
 
 .input::placeholder { color: var(--text-muted); }
@@ -293,7 +289,6 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: gradient-shift 4s ease infinite;
 }
 
 .label {
@@ -339,13 +334,11 @@
 .status-dot.connected::before {
   background: var(--accent-cyan);
   box-shadow: 0 0 8px var(--accent-cyan);
-  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 .status-dot.connecting::before {
   background: #fbbf24;
   box-shadow: 0 0 8px #fbbf24;
-  animation: pulse-dot 1s ease-in-out infinite;
 }
 
 .status-dot.disconnected::before {

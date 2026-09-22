@@ -7,7 +7,7 @@ const app = express()
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
-  maxHttpBufferSize: 200e6,
+  maxHttpBufferSize: 512e6, // 512 MB — supports 1 MB chunks
 })
 
 // ── In-memory rooms ──────────────────────────────────────────

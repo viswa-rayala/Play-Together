@@ -40,7 +40,6 @@ export default function Navbar() {
         left: 0,
         right: 0,
         zIndex: 1000,
-        transition: 'all 400ms cubic-bezier(0.4,0,0.2,1)',
         background: scrolled
           ? 'rgba(8, 12, 20, 0.85)'
           : 'transparent',
@@ -183,7 +182,6 @@ function NavLink({ to, active, children }) {
         fontWeight: 500,
         color: active ? 'var(--text-primary)' : 'var(--text-muted)',
         background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
-        transition: 'all 200ms ease',
         textDecoration: 'none',
       }}
       onMouseEnter={(e) => {

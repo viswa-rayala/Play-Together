@@ -115,11 +115,11 @@ class SocketService {
         break
 
       case 'MEDIA_SELECTED': {
-        // data = { name, url, mimeType, file }
+        // data = { name, url, mimeType, file, onProgress }
         // Store file for potential resends; send chunks to all participants
         if (data.file) {
           this._currentFile = data.file
-          this._sendChunks(data.file, null, null)
+          this._sendChunks(data.file, data.onProgress ?? null, null)
         }
         break
       }
@@ -151,7 +151,7 @@ class SocketService {
   // ─── Internal: chunk & send a File ────────────────────────
 
   async _sendChunks(file, onProgress, targetSocketId) {
-    const CHUNK_SIZE = 128 * 1024 // 128 KB per chunk
+    const CHUNK_SIZE = 1 * 1024 * 1024 // 1 MB per chunk — faster transfer
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
     const roomId = this._roomId
 
@@ -174,8 +174,8 @@ class SocketService {
 
       onProgress?.(Math.round(((i + 1) / totalChunks) * 100))
 
-      // Small yield to keep UI responsive
-      await new Promise((r) => setTimeout(r, 4))
+      // Minimal yield to keep UI responsive
+      if (i % 10 === 0) await new Promise((r) => setTimeout(r, 0))
     }
 
     this._socket?.emit('MEDIA_READY', {
