@@ -21,7 +21,7 @@ function ChatBox({ messages, onSend }) {
     <section className="chat-box" aria-label="Room chat">
       <div className="chat-header">
         <div>
-          <h2>Room chat</h2>
+          <h2><span className="chat-header-icon">✦</span> Room chat</h2>
           <span>{messages.length} messages</span>
         </div>
         <span className="chat-live-dot" aria-label="Chat connected" />
@@ -49,8 +49,8 @@ function ChatBox({ messages, onSend }) {
           aria-label="Chat message"
           autoComplete="off"
         />
-        <button type="submit" disabled={!draft.trim()} aria-label="Send message">
-          Send
+        <button type="submit" disabled={!draft.trim()} aria-label="Send message" title="Send message">
+          <span aria-hidden="true">➤</span>
         </button>
       </form>
     </section>

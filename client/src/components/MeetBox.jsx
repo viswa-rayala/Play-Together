@@ -193,7 +193,7 @@ function MeetBox({ participantName, isHost }) {
     <section className="meet-box" aria-label="Room meet">
       <div className="meet-header">
         <div>
-          <h2>Room meet</h2>
+          <h2><span className="meet-header-icon">▣</span> Room meet</h2>
           <span>{joined ? `${remotePeers.length + 1} connected` : 'Audio and video'}</span>
         </div>
         <span className={`meet-status-dot${joined ? ' active' : ''}`} />
@@ -215,19 +215,19 @@ function MeetBox({ participantName, isHost }) {
             {remotePeers.map((peer) => <RemoteTile key={peer.id} peer={peer} />)}
           </div>
           <div className="meet-controls">
-            <button type="button" className="meet-icon-button" onClick={() => toggleTrack('audio')} aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'} title={micOn ? 'Mute microphone' : 'Unmute microphone'}>
-              {micOn ? '🎤' : '🔇'}
+            <button type="button" className={`meet-icon-button${micOn ? '' : ' is-off'}`} onClick={() => toggleTrack('audio')} aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'} title={micOn ? 'Mute microphone' : 'Unmute microphone'}>
+              <span aria-hidden="true">{micOn ? '♩' : '×'}</span>
             </button>
-            <button type="button" className="meet-icon-button" onClick={() => toggleTrack('video')} aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
-              {cameraOn ? '📹' : '🚫'}
+            <button type="button" className={`meet-icon-button${cameraOn ? '' : ' is-off'}`} onClick={() => toggleTrack('video')} aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
+              <span aria-hidden="true">{cameraOn ? '▣' : '×'}</span>
             </button>
             <button type="button" className="meet-icon-button" onClick={switchCamera} aria-label="Switch front and back camera" title="Switch front and back camera">
-              🔄
+              <span aria-hidden="true">↻</span>
             </button>
             {isHost ? (
-              <button type="button" className="meet-leave" onClick={endMeet}>End meet</button>
+              <button type="button" className="meet-leave" onClick={endMeet} aria-label="End meet" title="End meet"><span aria-hidden="true">☎</span></button>
             ) : (
-              <button type="button" className="meet-leave" onClick={leaveMeet}>Leave meet</button>
+              <button type="button" className="meet-leave" onClick={leaveMeet} aria-label="Leave meet" title="Leave meet"><span aria-hidden="true">☎</span></button>
             )}
           </div>
           {error && <small className="meet-error">{error}</small>}

@@ -16,9 +16,23 @@
 }
 
 .meet-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   color: var(--text);
   font-size: 0.95rem;
+}
+
+.meet-header-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border-radius: 7px;
+  font-size: 0.8rem;
 }
 
 .meet-header span:not(.meet-status-dot) {
@@ -125,11 +139,38 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.meet-controls .meet-icon-button {
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1.25rem;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.meet-controls .meet-icon-button:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.meet-controls .meet-icon-button.is-off {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
 }
 
 .meet-controls .meet-leave {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
   background: #dc2626;
+  font-size: 1.1rem;
 }
 
 @media (max-width: 480px) {
