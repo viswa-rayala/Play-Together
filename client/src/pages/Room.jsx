@@ -29,7 +29,7 @@ function Room() {
   const [participants,  setParticipants] = useState([])  // [{id, name}]
   const [media,         setMedia]        = useState(null)   // { name, url }
   const [uploadProgress, setUploadProgress] = useState(null)
-    const [messages,       setMessages]       = useState([])
+  const [messages,       setMessages]       = useState([])
   const [playing,       setPlaying]      = useState(false)
   const [seekPosition,  setSeekPosition] = useState(0)
 
@@ -41,16 +41,14 @@ function Room() {
     const onConnStatus      = ({ status }) => setConnStatus(status)
     const onRoomState       = (s) => {
       setParticipants(s.participants)          // now an array
-        setMessages(s.messages || [])
+      setMessages(s.messages || [])
       if (s.media) setMedia(s.media)
       setPlaying(s.playback.playing)
       setSeekPosition(s.playback.position)
     }
     const onParticipantJoined = ({ participants }) => setParticipants(participants)
     const onParticipantLeft   = ({ participants }) => setParticipants(participants)
-      const onChatMessage = (message) => setMessages((current) => [...current, message].slice(-100))
-      mediaSocket.on('CHAT_MESSAGE', onChatMessage)
-      mediaSocket.off('CHAT_MESSAGE', onChatMessage)
+    const onChatMessage = (message) => setMessages((current) => [...current, message].slice(-100))
     const onPlay    = ({ position }) => { setPlaying(true);  setSeekPosition(position) }
     const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
     const onSeek    = ({ position }) => setSeekPosition(position)
@@ -64,6 +62,7 @@ function Room() {
     mediaSocket.on('ROOM_STATE',         onRoomState)
     mediaSocket.on('PARTICIPANT_JOINED', onParticipantJoined)
     mediaSocket.on('PARTICIPANT_LEFT',   onParticipantLeft)
+    mediaSocket.on('CHAT_MESSAGE',       onChatMessage)
     mediaSocket.on('PLAY',               onPlay)
     mediaSocket.on('PAUSE',              onPause)
     mediaSocket.on('SEEK',               onSeek)
@@ -79,6 +78,7 @@ function Room() {
       mediaSocket.off('ROOM_STATE',         onRoomState)
       mediaSocket.off('PARTICIPANT_JOINED', onParticipantJoined)
       mediaSocket.off('PARTICIPANT_LEFT',   onParticipantLeft)
+      mediaSocket.off('CHAT_MESSAGE',       onChatMessage)
       mediaSocket.off('PLAY',               onPlay)
       mediaSocket.off('PAUSE',              onPause)
       mediaSocket.off('SEEK',               onSeek)
