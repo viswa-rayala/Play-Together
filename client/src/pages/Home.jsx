@@ -5,32 +5,38 @@ function Home() {
   const navigate = useNavigate()
 
   return (
-    <div className="home-container">
-      <div className="home-content">
-        <div className="home-logo" aria-hidden="true">▶</div>
+    <div className="home-wrapper">
+      <main className="home-main">
+        <div className="brand-section">
+          <div className="brand-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+          <h1 className="brand-title">Play Together</h1>
+          <p className="brand-subtitle">Watch and listen in sync. No internet required.</p>
+        </div>
 
-        <h1 className="home-title">PLAY TOGETHER</h1>
-        <p className="home-tagline">Watch &amp; Listen Together — No Internet Required</p>
-
-        <div className="home-buttons">
+        <div className="action-section">
           <button
-            id="btn-create-room"
-            className="btn btn-primary home-btn"
+            className="btn-minimal btn-primary"
             onClick={() => navigate('/create')}
           >
-            🎬 Create Room
+            Create a Room
           </button>
+          
           <button
-            id="btn-join-room"
-            className="btn btn-secondary home-btn"
+            className="btn-minimal btn-outline"
             onClick={() => navigate('/join')}
           >
-            🔗 Join Room
+            Join a Room
           </button>
         </div>
 
-        <p className="home-note">📶 Works on the same local Wi-Fi or hotspot — no internet needed</p>
-      </div>
+        <footer className="home-footer">
+          <p>Works seamlessly on your local network.</p>
+        </footer>
+      </main>
     </div>
   )
 }
