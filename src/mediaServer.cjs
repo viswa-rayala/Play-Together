@@ -35,7 +35,8 @@ function getRoomState(roomId) {
             position: 0,
             playing: false,
             updatedAt: Date.now(),
-            participants: []
+            participants: [],
+            messages: []
         });
     }
 
@@ -230,6 +231,7 @@ function endRoom(roomId, roomState) {
     roomState.media = "";
     roomState.updatedAt = Date.now();
     roomState.participants = [];
+    roomState.messages = [];
     hostIds.delete(roomId);
 }
 
@@ -262,6 +264,7 @@ io.on("connection", socket => {
         "ROOM_STATE",
         {
             media: roomState.media,
+            messages: roomState.messages,
             position: getCurrentPosition(roomState),
             playing:
                 roomState.playing,
@@ -297,6 +300,25 @@ io.on("connection", socket => {
             );
         }
     );
+
+    socket.on("CHAT_MESSAGE", data => {
+        const message = String(data?.message || "").trim().slice(0, 500);
+        if (!message) return;
+
+        const chatMessage = {
+            id: `${socket.id}-${Date.now()}`,
+            name: participantName,
+            message,
+            sentAt: Date.now()
+        };
+
+        roomState.messages.push(chatMessage);
+        if (roomState.messages.length > 100) {
+            roomState.messages.shift();
+        }
+
+        io.to(roomId).emit("CHAT_MESSAGE", chatMessage);
+    });
 
     socket.on(
         "MEDIA_SELECTED",

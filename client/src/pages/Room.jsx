@@ -6,6 +6,7 @@ import RoomInfo        from '../components/RoomInfo'
 import AdminControls   from '../components/AdminControls'
 import PassengerPanel  from '../components/PassengerPanel'
 import ConnectionStatus from '../components/ConnectionStatus'
+import ChatBox          from '../components/ChatBox'
 import '../styles/Room.css'
 
 /**
@@ -28,6 +29,7 @@ function Room() {
   const [participants,  setParticipants] = useState([])  // [{id, name}]
   const [media,         setMedia]        = useState(null)   // { name, url }
   const [uploadProgress, setUploadProgress] = useState(null)
+    const [messages,       setMessages]       = useState([])
   const [playing,       setPlaying]      = useState(false)
   const [seekPosition,  setSeekPosition] = useState(0)
 
@@ -39,12 +41,16 @@ function Room() {
     const onConnStatus      = ({ status }) => setConnStatus(status)
     const onRoomState       = (s) => {
       setParticipants(s.participants)          // now an array
+        setMessages(s.messages || [])
       if (s.media) setMedia(s.media)
       setPlaying(s.playback.playing)
       setSeekPosition(s.playback.position)
     }
     const onParticipantJoined = ({ participants }) => setParticipants(participants)
     const onParticipantLeft   = ({ participants }) => setParticipants(participants)
+      const onChatMessage = (message) => setMessages((current) => [...current, message].slice(-100))
+      mediaSocket.on('CHAT_MESSAGE', onChatMessage)
+      mediaSocket.off('CHAT_MESSAGE', onChatMessage)
     const onPlay    = ({ position }) => { setPlaying(true);  setSeekPosition(position) }
     const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
     const onSeek    = ({ position }) => setSeekPosition(position)
@@ -189,6 +195,8 @@ function Room() {
             />
           )}
 
+          <ChatBox messages={messages} onSend={mediaSocket.sendChatMessage} />
+
         </aside>
 
         {/* ── Player area ── */}
@@ -219,7 +227,6 @@ function Room() {
             />
           )}
         </main>
-
       </div>
     </div>
   )

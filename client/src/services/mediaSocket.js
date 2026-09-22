@@ -42,6 +42,7 @@ export function connect(roomId, isHost, participantName = 'Participant') {
 
   socket.on('ROOM_STATE', (state) => {
     emit('ROOM_STATE', {
+      messages: state.messages || [],
       participants: state.participants || [],
       media: state.media ? { name: state.media, url: mediaUrl(state.media) } : null,
       playback: {
@@ -60,6 +61,7 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('SEEK', ({ position }) => emit('SEEK', { position }))
   socket.on('PARTICIPANT_JOINED', (data) => emit('PARTICIPANT_JOINED', data))
   socket.on('PARTICIPANT_LEFT', (data) => emit('PARTICIPANT_LEFT', data))
+  socket.on('CHAT_MESSAGE', (message) => emit('CHAT_MESSAGE', message))
   socket.on('HOST_DISCONNECTED', () => emit('HOST_DISCONNECTED', {}))
 }
 
@@ -106,8 +108,9 @@ export function sendPlay(position) { socket?.emit('PLAY', { position }) }
 export function sendPause(position) { socket?.emit('PAUSE', { position }) }
 export function sendSeek(position) { socket?.emit('SEEK', { position }) }
 export function sendMediaSelected(name) { socket?.emit('MEDIA_SELECTED', { media: name }) }
+export function sendChatMessage(message) { socket?.emit('CHAT_MESSAGE', { message }) }
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,
-  sendPlay, sendPause, sendSeek, sendMediaSelected,
+  sendPlay, sendPause, sendSeek, sendMediaSelected, sendChatMessage,
 }
