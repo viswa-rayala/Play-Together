@@ -6,6 +6,7 @@ import RoomInfo        from '../components/RoomInfo'
 import AdminControls   from '../components/AdminControls'
 import PassengerPanel  from '../components/PassengerPanel'
 import ConnectionStatus from '../components/ConnectionStatus'
+import ChatBox          from '../components/ChatBox'
 import '../styles/Room.css'
 
 /**
@@ -28,6 +29,7 @@ function Room() {
   const [participants,  setParticipants] = useState([])  // [{id, name}]
   const [media,         setMedia]        = useState(null)   // { name, url }
   const [uploadProgress, setUploadProgress] = useState(null)
+  const [messages,       setMessages]       = useState([])
   const [playing,       setPlaying]      = useState(false)
   const [seekPosition,  setSeekPosition] = useState(0)
 
@@ -39,12 +41,18 @@ function Room() {
     const onConnStatus      = ({ status }) => setConnStatus(status)
     const onRoomState       = (s) => {
       setParticipants(s.participants)          // now an array
+      setMessages(s.messages || [])
       if (s.media) setMedia(s.media)
       setPlaying(s.playback.playing)
       setSeekPosition(s.playback.position)
     }
     const onParticipantJoined = ({ participants }) => setParticipants(participants)
     const onParticipantLeft   = ({ participants }) => setParticipants(participants)
+    const onChatMessage = (message) => setMessages((current) => (
+      current.some((item) => item.id === message.id)
+        ? current
+        : [...current, message].slice(-100)
+    ))
     const onPlay    = ({ position }) => { setPlaying(true);  setSeekPosition(position) }
     const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
     const onSeek    = ({ position }) => setSeekPosition(position)
@@ -58,6 +66,7 @@ function Room() {
     mediaSocket.on('ROOM_STATE',         onRoomState)
     mediaSocket.on('PARTICIPANT_JOINED', onParticipantJoined)
     mediaSocket.on('PARTICIPANT_LEFT',   onParticipantLeft)
+    mediaSocket.on('CHAT_MESSAGE',       onChatMessage)
     mediaSocket.on('PLAY',               onPlay)
     mediaSocket.on('PAUSE',              onPause)
     mediaSocket.on('SEEK',               onSeek)
@@ -73,6 +82,7 @@ function Room() {
       mediaSocket.off('ROOM_STATE',         onRoomState)
       mediaSocket.off('PARTICIPANT_JOINED', onParticipantJoined)
       mediaSocket.off('PARTICIPANT_LEFT',   onParticipantLeft)
+      mediaSocket.off('CHAT_MESSAGE',       onChatMessage)
       mediaSocket.off('PLAY',               onPlay)
       mediaSocket.off('PAUSE',              onPause)
       mediaSocket.off('SEEK',               onSeek)
@@ -102,6 +112,12 @@ function Room() {
   const handlePlay  = (pos) => { setPlaying(true);  setSeekPosition(pos); mediaSocket.sendPlay(pos) }
   const handlePause = (pos) => { setPlaying(false); setSeekPosition(pos); mediaSocket.sendPause(pos) }
   const handleSeek  = (pos) => { setSeekPosition(pos); mediaSocket.sendSeek(pos) }
+  const handleChatSend = (message) => {
+    const clientMessageId = `${participantName}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const chatMessage = { id: clientMessageId, name: participantName, message }
+    setMessages((current) => [...current, chatMessage].slice(-100))
+    mediaSocket.sendChatMessage(message, clientMessageId)
+  }
 
   /**
    * handleAddParticipant — wires to socketService.addParticipant.
@@ -189,6 +205,8 @@ function Room() {
             />
           )}
 
+          <ChatBox messages={messages} onSend={handleChatSend} />
+
         </aside>
 
         {/* ── Player area ── */}
@@ -219,7 +237,6 @@ function Room() {
             />
           )}
         </main>
-
       </div>
     </div>
   )
