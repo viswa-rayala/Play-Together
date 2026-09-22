@@ -108,7 +108,9 @@ export function sendPlay(position) { socket?.emit('PLAY', { position }) }
 export function sendPause(position) { socket?.emit('PAUSE', { position }) }
 export function sendSeek(position) { socket?.emit('SEEK', { position }) }
 export function sendMediaSelected(name) { socket?.emit('MEDIA_SELECTED', { media: name }) }
-export function sendChatMessage(message) { socket?.emit('CHAT_MESSAGE', { message }) }
+export function sendChatMessage(message, clientMessageId) {
+  socket?.emit('CHAT_MESSAGE', { message, clientMessageId })
+}
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,

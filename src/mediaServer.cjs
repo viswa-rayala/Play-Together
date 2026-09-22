@@ -306,7 +306,7 @@ io.on("connection", socket => {
         if (!message) return;
 
         const chatMessage = {
-            id: `${socket.id}-${Date.now()}`,
+            id: String(data?.clientMessageId || `${socket.id}-${Date.now()}`),
             name: participantName,
             message,
             sentAt: Date.now()

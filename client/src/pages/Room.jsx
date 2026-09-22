@@ -48,7 +48,11 @@ function Room() {
     }
     const onParticipantJoined = ({ participants }) => setParticipants(participants)
     const onParticipantLeft   = ({ participants }) => setParticipants(participants)
-    const onChatMessage = (message) => setMessages((current) => [...current, message].slice(-100))
+    const onChatMessage = (message) => setMessages((current) => (
+      current.some((item) => item.id === message.id)
+        ? current
+        : [...current, message].slice(-100)
+    ))
     const onPlay    = ({ position }) => { setPlaying(true);  setSeekPosition(position) }
     const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
     const onSeek    = ({ position }) => setSeekPosition(position)
@@ -108,6 +112,12 @@ function Room() {
   const handlePlay  = (pos) => { setPlaying(true);  setSeekPosition(pos); mediaSocket.sendPlay(pos) }
   const handlePause = (pos) => { setPlaying(false); setSeekPosition(pos); mediaSocket.sendPause(pos) }
   const handleSeek  = (pos) => { setSeekPosition(pos); mediaSocket.sendSeek(pos) }
+  const handleChatSend = (message) => {
+    const clientMessageId = `${participantName}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const chatMessage = { id: clientMessageId, name: participantName, message }
+    setMessages((current) => [...current, chatMessage].slice(-100))
+    mediaSocket.sendChatMessage(message, clientMessageId)
+  }
 
   /**
    * handleAddParticipant — wires to socketService.addParticipant.
@@ -195,7 +205,7 @@ function Room() {
             />
           )}
 
-          <ChatBox messages={messages} onSend={mediaSocket.sendChatMessage} />
+          <ChatBox messages={messages} onSend={handleChatSend} />
 
         </aside>
 
