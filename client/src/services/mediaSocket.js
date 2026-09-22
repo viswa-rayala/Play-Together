@@ -63,13 +63,30 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('HOST_DISCONNECTED', () => emit('HOST_DISCONNECTED', {}))
 }
 
-export async function uploadMedia(file) {
+export function uploadMedia(file, onProgress) {
   const formData = new FormData()
   formData.append('media', file)
-  const response = await fetch(`${MEDIA_URL}/upload`, { method: 'POST', body: formData })
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error || 'Media upload failed.')
-  return { name: data.media, url: mediaUrl(data.media) }
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open('POST', `${MEDIA_URL}/upload`)
+    request.responseType = 'json'
+
+    request.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total)
+    })
+    request.addEventListener('load', () => {
+      const data = request.response || {}
+      if (request.status < 200 || request.status >= 300) {
+        reject(new Error(data.error || 'Media upload failed.'))
+        return
+      }
+      onProgress?.(1)
+      resolve({ name: data.media, url: mediaUrl(data.media) })
+    })
+    request.addEventListener('error', () => reject(new Error('Media upload failed.')))
+    request.addEventListener('abort', () => reject(new Error('Media upload was cancelled.')))
+    request.send(formData)
+  })
 }
 
 export function disconnect() {

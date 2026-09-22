@@ -27,6 +27,7 @@ function Room() {
   const [connStatus,    setConnStatus]   = useState('connecting')
   const [participants,  setParticipants] = useState([])  // [{id, name}]
   const [media,         setMedia]        = useState(null)   // { name, url }
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [playing,       setPlaying]      = useState(false)
   const [seekPosition,  setSeekPosition] = useState(0)
 
@@ -84,10 +85,15 @@ function Room() {
   // ── Host callbacks ─────────────────────────────────────────────────────────────
   const handleFileSelect = async (file) => {
     try {
-      const uploadedMedia = await mediaSocket.uploadMedia(file)
+      setUploadProgress(0)
+      const uploadedMedia = await mediaSocket.uploadMedia(file, (progress) => {
+        setUploadProgress(progress)
+      })
       setMedia(uploadedMedia)
       mediaSocket.sendMediaSelected(uploadedMedia.name)
+      setUploadProgress(null)
     } catch (error) {
+      setUploadProgress(null)
       setConnStatus('error')
       console.error('Media upload failed:', error)
     }
@@ -166,6 +172,7 @@ function Room() {
               <div className="sidebar-divider" />
               <AdminControls
                 media={media}
+                uploadProgress={uploadProgress}
                 participants={participants}
                 onFileSelect={handleFileSelect}
                 onRemoveParticipant={handleRemoveParticipant}

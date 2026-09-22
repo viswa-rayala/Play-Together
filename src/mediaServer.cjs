@@ -119,7 +119,9 @@ app.get("/media/:file", (req, res) => {
             "Content-Length": size,
             "Content-Type":
                 getContentType(fileName),
-            "Accept-Ranges": "bytes"
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=3600",
+            "Content-Disposition": "inline"
         });
 
         return fs
@@ -160,7 +162,9 @@ app.get("/media/:file", (req, res) => {
         "Accept-Ranges": "bytes",
         "Content-Length": chunkSize,
         "Content-Type":
-            getContentType(fileName)
+            getContentType(fileName),
+        "Cache-Control": "public, max-age=3600",
+        "Content-Disposition": "inline"
     });
 
     fs.createReadStream(

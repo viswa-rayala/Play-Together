@@ -14,6 +14,7 @@ import '../styles/AdminControls.css'
  */
 function AdminControls({
   media,
+  uploadProgress,
   participants,
   onFileSelect,
   onRemoveParticipant,
@@ -51,9 +52,21 @@ function AdminControls({
           id="btn-select-media"
           className="btn btn-secondary ac-pick-btn"
           onClick={() => fileInputRef.current.click()}
+          disabled={uploadProgress !== null}
         >
-          {media ? '📂 Change File' : '📂 Select File'}
+          {uploadProgress !== null
+            ? `Uploading ${Math.round(uploadProgress * 100)}%`
+            : media ? '📂 Change File' : '📂 Select File'}
         </button>
+
+        {uploadProgress !== null && (
+          <progress
+            className="ac-upload-progress"
+            value={uploadProgress}
+            max="1"
+            aria-label="Media upload progress"
+          />
+        )}
 
         {/* Hidden native file input */}
         <input
