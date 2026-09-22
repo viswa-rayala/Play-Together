@@ -214,17 +214,33 @@ function getCurrentPosition(roomState) {
     return roomState.position + elapsed;
 }
 
+function removeParticipant(roomState, socketId) {
+    roomState.participants = roomState.participants.filter(
+        participant => participant.id !== socketId
+    );
+}
+
+function endRoom(roomId, roomState) {
+    roomState.playing = false;
+    roomState.position = 0;
+    roomState.media = "";
+    roomState.updatedAt = Date.now();
+    roomState.participants = [];
+    hostIds.delete(roomId);
+}
+
 io.on("connection", socket => {
 
     const roomId = String(socket.handshake.auth?.roomId || "default");
     const roomState = getRoomState(roomId);
+    const participantName = String(socket.handshake.auth?.name || "Participant").trim() || "Participant";
     let hostId = hostIds.get(roomId) || null;
 
     socket.join(roomId);
-    roomState.participants.push({ id: socket.id, name: "Participant" });
+    roomState.participants.push({ id: socket.id, name: participantName });
 
     console.log(
-        "Client connected:", socket.id, "Room:", roomId
+        "Client connected:", socket.id, "Room:", roomId, "Name:", participantName
     );
 
     if (!hostId && socket.handshake.auth?.isHost === true) {
@@ -449,6 +465,22 @@ io.on("connection", socket => {
         }
     );
 
+    socket.on("LEAVE_ROOM", () => {
+        const isHostLeaving = socket.id === hostId;
+
+        if (isHostLeaving) {
+            console.log("Host left room:", roomId);
+            endRoom(roomId, roomState);
+            io.to(roomId).emit("HOST_DISCONNECTED");
+            return;
+        }
+
+        removeParticipant(roomState, socket.id);
+        socket.to(roomId).emit("PARTICIPANT_LEFT", {
+            participants: roomState.participants
+        });
+    });
+
     socket.on(
         "disconnect",
         () => {
@@ -458,9 +490,7 @@ io.on("connection", socket => {
                 socket.id
             );
 
-            roomState.participants = roomState.participants.filter(
-                participant => participant.id !== socket.id
-            );
+            removeParticipant(roomState, socket.id);
 
             socket.to(roomId).emit("PARTICIPANT_LEFT", {
                 participants: roomState.participants
@@ -472,20 +502,7 @@ io.on("connection", socket => {
                     "Host disconnected"
                 );
 
-                hostIds.delete(roomId);
-
-                roomState.playing =
-                    false;
-
-                roomState.position =
-                    0;
-
-                roomState.media =
-                    "";
-
-                roomState.updatedAt =
-                    Date.now();
-
+                endRoom(roomId, roomState);
                 io.to(roomId).emit(
                     "HOST_DISCONNECTED"
                 );

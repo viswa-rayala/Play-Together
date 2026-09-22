@@ -23,14 +23,14 @@ export function off(event, callback) {
   listeners.set(event, callbacks.filter((item) => item !== callback))
 }
 
-export function connect(roomId, isHost) {
+export function connect(roomId, isHost, participantName = 'Participant') {
   disconnect()
   currentRoomId = roomId
   emit('CONNECTION_STATUS', { status: 'connecting' })
 
   socket = io(MEDIA_URL, {
     transports: ['websocket', 'polling'],
-    auth: { roomId, isHost },
+    auth: { roomId, isHost, name: participantName || 'Participant' },
   })
 
   socket.on('connect', () => emit('CONNECTION_STATUS', { status: 'connected' }))

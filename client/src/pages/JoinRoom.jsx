@@ -6,6 +6,7 @@ import '../styles/JoinRoom.css'
 function JoinRoom() {
   const navigate = useNavigate()
   const [roomId, setRoomId] = useState('')
+  const [name, setName] = useState('')
   const [error,  setError]  = useState('')
   const [joining, setJoining] = useState(false)
 
@@ -20,7 +21,14 @@ function JoinRoom() {
 
   const handleJoin = async () => {
     const v = roomId.trim().toUpperCase()
+    const cleanName = name.trim()
     const err = validate(v)
+
+    if (!cleanName) {
+      setError('Please enter your name before joining.')
+      return
+    }
+
     if (err) { setError(err); return }
 
     setJoining(true)
@@ -34,7 +42,7 @@ function JoinRoom() {
         return
       }
 
-      navigate(`/room/${v}?host=false`)
+      navigate(`/room/${v}?host=false&name=${encodeURIComponent(cleanName)}`)
     } catch (joinError) {
       setError(joinError.message || 'Unable to validate room.')
       setJoining(false)
@@ -43,7 +51,12 @@ function JoinRoom() {
 
   const handleChange = (e) => {
     setRoomId(e.target.value)
-    if (error) setError('')        // clear error as user types
+    if (error) setError('')
+  }
+
+  const handleNameChange = (e) => {
+    setName(e.target.value)
+    if (error) setError('')
   }
 
   const handleKeyDown = (e) => {
@@ -57,7 +70,23 @@ function JoinRoom() {
         <button className="back-btn" onClick={() => navigate('/')}>← Back</button>
 
         <h1 className="join-title">Join a Room</h1>
-        <p className="join-sub">Enter the Room ID shared by the host.</p>
+        <p className="join-sub">Enter your name and the Room ID shared by the host.</p>
+
+        <div className="input-group">
+          <label htmlFor="participant-name-input">Your Name</label>
+          <input
+            id="participant-name-input"
+            type="text"
+            className={`room-id-input ${error ? 'input-error' : ''}`}
+            placeholder="e.g. Alex"
+            value={name}
+            maxLength={30}
+            onChange={handleNameChange}
+            onKeyDown={handleKeyDown}
+            autoComplete="name"
+            spellCheck={false}
+          />
+        </div>
 
         <div className="input-group">
           <label htmlFor="room-id-input">Room ID</label>

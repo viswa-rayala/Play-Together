@@ -21,6 +21,7 @@ function Room() {
   const [searchParams]   = useSearchParams()
   const navigate         = useNavigate()
   const isHost           = searchParams.get('host') === 'true'
+  const participantName  = searchParams.get('name') || 'Participant'
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [connStatus,    setConnStatus]   = useState('connecting')
@@ -47,6 +48,10 @@ function Room() {
     const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
     const onSeek    = ({ position }) => setSeekPosition(position)
     const onMediaSelected = ({ media }) => setMedia(media)
+    const onHostDisconnected = () => {
+      mediaSocket.disconnect()
+      navigate('/')
+    }
 
     mediaSocket.on('CONNECTION_STATUS',  onConnStatus)
     mediaSocket.on('ROOM_STATE',         onRoomState)
@@ -56,9 +61,10 @@ function Room() {
     mediaSocket.on('PAUSE',              onPause)
     mediaSocket.on('SEEK',               onSeek)
     mediaSocket.on('MEDIA_SELECTED',     onMediaSelected)
+    mediaSocket.on('HOST_DISCONNECTED',  onHostDisconnected)
 
     // Connect to room
-    mediaSocket.connect(roomId, isHost)
+    mediaSocket.connect(roomId, isHost, participantName)
 
     // Cleanup on unmount
     return () => {
@@ -70,9 +76,10 @@ function Room() {
       mediaSocket.off('PAUSE',              onPause)
       mediaSocket.off('SEEK',               onSeek)
       mediaSocket.off('MEDIA_SELECTED',     onMediaSelected)
+      mediaSocket.off('HOST_DISCONNECTED',  onHostDisconnected)
       mediaSocket.disconnect()
     }
-  }, [roomId, isHost])
+  }, [roomId, isHost, participantName, navigate])
 
   // ── Host callbacks ─────────────────────────────────────────────────────────────
   const handleFileSelect = async (file) => {
