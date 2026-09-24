@@ -97,6 +97,7 @@ Use both variables when the services are hosted at different URLs. Do not put Su
 - Host and participant names are required when entering a room.
 - Hosts upload video or audio files and control synchronized play, pause, and seeking.
 - Participants receive room playback updates through Socket.IO.
+- **Soft Synchronization:** The system actively corrects playback drift by adjusting participant video speed smoothly, avoiding jarring skips.
 - Room chat displays messages as `Name: message` and keeps the latest 100 messages in memory.
 - Meet supports camera and microphone controls, front/back camera switching, remote video tiles, and host-controlled Meet ending.
 - WebRTC uses a public STUN server. A TURN server may be required for users behind restrictive networks.
