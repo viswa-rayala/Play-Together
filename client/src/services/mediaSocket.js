@@ -59,6 +59,7 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('PLAY_CONFIRMED', ({ position }) => emit('PLAY', { position }))
   socket.on('PAUSE', ({ position }) => emit('PAUSE', { position }))
   socket.on('SEEK', ({ position }) => emit('SEEK', { position }))
+  socket.on('SYNC', ({ position, playing, serverTime }) => emit('SYNC', { position, playing, serverTime }))
   socket.on('PARTICIPANT_JOINED', (data) => emit('PARTICIPANT_JOINED', data))
   socket.on('PARTICIPANT_LEFT', (data) => emit('PARTICIPANT_LEFT', data))
   socket.on('CHAT_MESSAGE', (message) => emit('CHAT_MESSAGE', message))
@@ -112,6 +113,7 @@ export function leaveRoom() {
 export function sendPlay(position) { socket?.emit('PLAY', { position }) }
 export function sendPause(position) { socket?.emit('PAUSE', { position }) }
 export function sendSeek(position) { socket?.emit('SEEK', { position }) }
+export function sendSync(position, playing) { socket?.emit('SYNC', { position, playing }) }
 export function sendMediaSelected(name) { socket?.emit('MEDIA_SELECTED', { media: name }) }
 export function sendChatMessage(message, clientMessageId) {
   socket?.emit('CHAT_MESSAGE', { message, clientMessageId })
@@ -124,5 +126,5 @@ export function sendMeetEnd() { socket?.emit('MEET_END') }
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,
-  sendPlay, sendPause, sendSeek, sendMediaSelected, sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
+  sendPlay, sendPause, sendSeek, sendSync, sendMediaSelected, sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
 }

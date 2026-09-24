@@ -57,6 +57,12 @@ function Room() {
     const onPlay    = ({ position }) => { setPlaying(true);  setSeekPosition(position) }
     const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
     const onSeek    = ({ position }) => setSeekPosition(position)
+    const onSync    = ({ position, playing }) => {
+      setPlaying(playing)
+      // Note: serverTime cannot be reliably compared to client's Date.now() 
+      // due to system clock drift. Soft-sync in MediaPlayer handles minor latency.
+      setSeekPosition(position)
+    }
     const onMediaSelected = ({ media }) => setMedia(media)
     const onHostDisconnected = () => {
       mediaSocket.disconnect()
@@ -71,6 +77,7 @@ function Room() {
     mediaSocket.on('PLAY',               onPlay)
     mediaSocket.on('PAUSE',              onPause)
     mediaSocket.on('SEEK',               onSeek)
+    mediaSocket.on('SYNC',               onSync)
     mediaSocket.on('MEDIA_SELECTED',     onMediaSelected)
     mediaSocket.on('HOST_DISCONNECTED',  onHostDisconnected)
 
@@ -87,6 +94,7 @@ function Room() {
       mediaSocket.off('PLAY',               onPlay)
       mediaSocket.off('PAUSE',              onPause)
       mediaSocket.off('SEEK',               onSeek)
+      mediaSocket.off('SYNC',               onSync)
       mediaSocket.off('MEDIA_SELECTED',     onMediaSelected)
       mediaSocket.off('HOST_DISCONNECTED',  onHostDisconnected)
       mediaSocket.disconnect()
@@ -113,6 +121,7 @@ function Room() {
   const handlePlay  = (pos) => { setPlaying(true);  setSeekPosition(pos); mediaSocket.sendPlay(pos) }
   const handlePause = (pos) => { setPlaying(false); setSeekPosition(pos); mediaSocket.sendPause(pos) }
   const handleSeek  = (pos) => { setSeekPosition(pos); mediaSocket.sendSeek(pos) }
+  const handleSync  = (pos, isPlaying) => { mediaSocket.sendSync(pos, isPlaying) }
   const handleChatSend = (message) => {
     const clientMessageId = `${participantName}-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const chatMessage = { id: clientMessageId, name: participantName, message }
@@ -236,6 +245,7 @@ function Room() {
               onPlay={handlePlay}
               onPause={handlePause}
               onSeek={handleSeek}
+              onSync={handleSync}
             />
           )}
             <MeetBox participantName={participantName} isHost={isHost} />

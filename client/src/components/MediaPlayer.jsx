@@ -24,7 +24,7 @@ function getExt(name = '') {
  * Ref: exposes { getCurrentTime, getDuration } for parent use
  */
 const MediaPlayer = forwardRef(function MediaPlayer(
-  { src, mediaName, isHost, playing, seekPosition, onPlay, onPause, onSeek },
+  { src, mediaName, isHost, playing, seekPosition, onPlay, onPause, onSeek, onSync },
   ref
 ) {
   const mediaRef    = useRef(null)
@@ -61,6 +61,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
         .catch(() => setAutoplayBlocked(true))
     } else {
       el.pause()
+      el.playbackRate = 1.0 // Reset rate on pause
     }
   }, [playing])
 
@@ -68,16 +69,49 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     setAutoplayBlocked(false)
   }, [src])
 
+  // Periodic sync emission for host
+  useEffect(() => {
+    if (!isHost || !playing) return
+    const interval = setInterval(() => {
+      const el = mediaRef.current
+      if (el && !el.paused) {
+        onSync?.(el.currentTime, true)
+      }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [isHost, playing, onSync])
+
   // Sync seek position from parent (participant view)
   useEffect(() => {
     if (prevSeekRef.current === seekPosition) return
     prevSeekRef.current = seekPosition
     const el = mediaRef.current
-    if (!el) return
-    if (Math.abs(el.currentTime - seekPosition) > 0.5) {
-      el.currentTime = seekPosition
+    if (!el || isHost) return
+    
+    const diff = seekPosition - el.currentTime
+    
+    if (playing) {
+      if (Math.abs(diff) > 3.0) {
+        // Hard seek if significantly out of sync
+        el.currentTime = seekPosition
+        el.playbackRate = 1.0
+      } else if (diff > 0.2) {
+        // Behind the host, speed up slightly
+        el.playbackRate = 1.1
+      } else if (diff < -0.2) {
+        // Ahead of the host, slow down slightly
+        el.playbackRate = 0.9
+      } else {
+        // In sync
+        el.playbackRate = 1.0
+      }
+    } else {
+      // If paused, hard seek immediately if out of sync
+      if (Math.abs(diff) > 0.1) {
+        el.currentTime = seekPosition
+      }
     }
-  }, [seekPosition])
+  }, [seekPosition, playing, isHost])
 
   // ── Event handlers ────────────────────────────────────────────────────────
   const handleTimeUpdate = () => {
