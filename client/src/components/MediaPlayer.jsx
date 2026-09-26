@@ -77,7 +77,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
       if (el && !el.paused) {
         onSync?.(el.currentTime, true)
       }
-    }, 2000)
+    }, 500)
     return () => clearInterval(interval)
   }, [isHost, playing, onSync])
 
@@ -91,14 +91,14 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     const diff = seekPosition - el.currentTime
     
     if (playing) {
-      if (Math.abs(diff) > 3.0) {
+      if (Math.abs(diff) > 1.0) {
         // Hard seek if significantly out of sync
         el.currentTime = seekPosition
         el.playbackRate = 1.0
-      } else if (diff > 0.2) {
+      } else if (diff > 0.1) {
         // Behind the host, speed up slightly
         el.playbackRate = 1.1
-      } else if (diff < -0.2) {
+      } else if (diff < -0.1) {
         // Ahead of the host, slow down slightly
         el.playbackRate = 0.9
       } else {

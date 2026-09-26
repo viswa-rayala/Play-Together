@@ -29,7 +29,7 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   emit('CONNECTION_STATUS', { status: 'connecting' })
 
   socket = io(MEDIA_URL, {
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
     auth: { roomId, isHost, name: participantName || 'Participant' },
   })
 
