@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client'
 
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || `http://${window.location.hostname}:3000`
+const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'https://playtogethr.vercel.app'
 const listeners = new Map()
 let socket = null
 let currentRoomId = null
