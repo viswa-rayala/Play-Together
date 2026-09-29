@@ -195,13 +195,15 @@
 
 .stage-title {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--text);
-  max-width: 380px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .stage-sub {
@@ -345,6 +347,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .stage-ambient-card {
+    padding: 24px 16px;
+    gap: 10px;
+    max-width: 100%;
+  }
+
+  .stage-title {
+    font-size: 1.1rem;
+    line-height: 1.35;
   }
 
   /* Video stage player takes full width on mobile */

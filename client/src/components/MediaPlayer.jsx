@@ -52,6 +52,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [accentColor, setAccentColor] = useState('#6366f1')
+  const [showFullName, setShowFullName] = useState(false)
   const prevPlayingRef  = useRef(playing)
   const prevSeekRef     = useRef(seekPosition)
   const playerShellRef  = useRef(null)
@@ -273,7 +274,13 @@ const MediaPlayer = forwardRef(function MediaPlayer(
         )}
 
         <div className="mp-media-info-pill">
-          <span className="mp-media-name-txt" title={mediaName}>{mediaName || 'Untitled'}</span>
+          <span
+            className={`mp-media-name-txt ${showFullName ? 'show-full' : ''}`}
+            title={mediaName}
+            onClick={() => setShowFullName((prev) => !prev)}
+          >
+            {mediaName || 'Untitled'}
+          </span>
           <span className={`mp-media-live-tag ${playing ? 'live' : 'paused'}`}>
             {playing ? '▶ Playing' : '⏸ Paused'}
           </span>
