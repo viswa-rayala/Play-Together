@@ -4,6 +4,8 @@ const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'https://playtogethr.vercel.
 const listeners = new Map()
 let socket = null
 let currentRoomId = null
+let serverOffset = 0
+let clockSyncInterval = null
 
 function emit(event, data) {
   ;(listeners.get(event) || []).forEach((callback) => callback(data))
@@ -11,6 +13,22 @@ function emit(event, data) {
 
 function mediaUrl(name) {
   return `${MEDIA_URL}/media/${encodeURIComponent(name)}`
+}
+
+export function syncClock() {
+  if (!socket || !socket.connected) return
+  const t0 = Date.now()
+  socket.emit('TIME_REQUEST')
+  socket.once('TIME_RESPONSE', ({ serverTime }) => {
+    const t1 = Date.now()
+    const rtt = t1 - t0
+    // NTP formula: offset = serverTime - (t0 + rtt / 2)
+    serverOffset = Number(serverTime) - (t0 + rtt / 2)
+  })
+}
+
+export function getServerTime() {
+  return Date.now() + serverOffset
 }
 
 export function on(event, callback) {
@@ -33,7 +51,12 @@ export function connect(roomId, isHost, participantName = 'Participant') {
     auth: { roomId, isHost, name: participantName || 'Participant' },
   })
 
-  socket.on('connect', () => emit('CONNECTION_STATUS', { status: 'connected' }))
+  socket.on('connect', () => {
+    emit('CONNECTION_STATUS', { status: 'connected' })
+    syncClock()
+    if (clockSyncInterval) clearInterval(clockSyncInterval)
+    clockSyncInterval = setInterval(syncClock, 10000)
+  })
   socket.on('disconnect', () => emit('CONNECTION_STATUS', { status: 'disconnected' }))
   socket.on('connect_error', (error) => {
     console.error('Media server connection error:', error)
@@ -49,6 +72,7 @@ export function connect(roomId, isHost, participantName = 'Participant') {
         playing: Boolean(state.playing),
         position: Number(state.position) || 0,
       },
+      serverTime: state.serverTime,
     })
   })
 
@@ -98,6 +122,10 @@ export function uploadMedia(file, onProgress) {
 }
 
 export function disconnect() {
+  if (clockSyncInterval) {
+    clearInterval(clockSyncInterval)
+    clockSyncInterval = null
+  }
   if (socket) {
     socket.disconnect()
     socket = null
@@ -126,5 +154,6 @@ export function sendMeetEnd() { socket?.emit('MEET_END') }
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,
+  syncClock, getServerTime,
   sendPlay, sendPause, sendSeek, sendSync, sendMediaSelected, sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
 }

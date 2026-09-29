@@ -77,39 +77,43 @@ const MediaPlayer = forwardRef(function MediaPlayer(
       if (el && !el.paused) {
         onSync?.(el.currentTime, true)
       }
-    }, 500)
+    }, 800)
     return () => clearInterval(interval)
   }, [isHost, playing, onSync])
 
-  // Sync seek position from parent (participant view)
+  // Sync seek position and soft-drift correction from parent (participant view)
   useEffect(() => {
     if (prevSeekRef.current === seekPosition) return
     prevSeekRef.current = seekPosition
     const el = mediaRef.current
     if (!el || isHost) return
     
+    // Enable pitch preservation for seamless micro-adjustments
+    el.preservesPitch = true
+    if ('mozPreservesPitch' in el) el.mozPreservesPitch = true
+    if ('webkitPreservesPitch' in el) el.webkitPreservesPitch = true
+
     const diff = seekPosition - el.currentTime
     
     if (playing) {
-      if (Math.abs(diff) > 1.0) {
-        // Hard seek if significantly out of sync
+      if (Math.abs(diff) > 1.2) {
+        // Hard seek if significantly out of sync (e.g. host seek or network stall)
         el.currentTime = seekPosition
         el.playbackRate = 1.0
-      } else if (diff > 0.1) {
-        // Behind the host, speed up slightly
-        el.playbackRate = 1.1
-      } else if (diff < -0.1) {
-        // Ahead of the host, slow down slightly
-        el.playbackRate = 0.9
-      } else {
-        // In sync
+      } else if (Math.abs(diff) <= 0.04) {
+        // Deadband: within ±40ms is considered in perfect sync (no speed oscillation)
         el.playbackRate = 1.0
+      } else {
+        // Proportional speed adjustment (clamped between 0.95x and 1.05x)
+        const adjustment = Math.min(Math.max(diff * 0.25, -0.05), 0.05)
+        el.playbackRate = 1.0 + adjustment
       }
     } else {
       // If paused, hard seek immediately if out of sync
-      if (Math.abs(diff) > 0.1) {
+      if (Math.abs(diff) > 0.05) {
         el.currentTime = seekPosition
       }
+      el.playbackRate = 1.0
     }
   }, [seekPosition, playing, isHost])
 

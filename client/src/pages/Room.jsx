@@ -45,7 +45,12 @@ function Room() {
       setMessages(s.messages || [])
       if (s.media) setMedia(s.media)
       setPlaying(s.playback.playing)
-      setSeekPosition(s.playback.position)
+      if (s.playback.playing && s.serverTime) {
+        const elapsed = Math.max(0, (mediaSocket.getServerTime() - s.serverTime) / 1000)
+        setSeekPosition(s.playback.position + elapsed)
+      } else {
+        setSeekPosition(s.playback.position)
+      }
     }
     const onParticipantJoined = ({ participants }) => setParticipants(participants)
     const onParticipantLeft   = ({ participants }) => setParticipants(participants)
@@ -54,14 +59,25 @@ function Room() {
         ? current
         : [...current, message].slice(-100)
     ))
-    const onPlay    = ({ position }) => { setPlaying(true);  setSeekPosition(position) }
+    const onPlay    = ({ position, serverTime }) => {
+      setPlaying(true)
+      if (serverTime) {
+        const elapsed = Math.max(0, (mediaSocket.getServerTime() - serverTime) / 1000)
+        setSeekPosition(position + elapsed)
+      } else {
+        setSeekPosition(position)
+      }
+    }
     const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
     const onSeek    = ({ position }) => setSeekPosition(position)
-    const onSync    = ({ position, playing }) => {
+    const onSync    = ({ position, playing, serverTime }) => {
       setPlaying(playing)
-      // Note: serverTime cannot be reliably compared to client's Date.now() 
-      // due to system clock drift. Soft-sync in MediaPlayer handles minor latency.
-      setSeekPosition(position)
+      if (playing && serverTime) {
+        const elapsed = Math.max(0, (mediaSocket.getServerTime() - serverTime) / 1000)
+        setSeekPosition(position + elapsed)
+      } else {
+        setSeekPosition(position)
+      }
     }
     const onMediaSelected = ({ media }) => setMedia(media)
     const onHostDisconnected = () => {
