@@ -1,40 +1,106 @@
 # Play Together
 
-Play Together is a React application for shared media rooms. A host creates a room, shares its ID, and other users can join for synchronized playback, realtime chat, and an optional audio/video Meet.
+Play Together is a React application for shared media rooms. A host creates a room, shares its 6-character ID, and other users join for synchronized video/audio playback, real-time chat, a media playlist queue, and an optional video Meet -- all without requiring any account or login.
 
-## Current Architecture
+## Architecture
 
 ```text
 Browser (React + Vite)
-   | HTTP: room creation and validation
-   | Socket.IO: playback, chat, and WebRTC signaling
-   v
-Express API (server/)          Media server (src/mediaServer.cjs)
-   |                           | upload and byte-range streaming
-   |                           | room state and Socket.IO
-   v                           v
-In-memory room registry        WebRTC peer connections in browsers
+   |
+   |-- HTTP --> Express API (server/)
+   |            Room creation and validation (in-memory)
+   |
+   +-- Socket.IO + HTTP --> Media Server (src/mediaServer.cjs)
+                               |  File upload and byte-range streaming
+                               |  Room playback state management
+                               |  Real-time chat (latest 100 messages)
+                               |  Playlist management
+                               |  WebRTC Meet signaling
+                               +-- WebRTC peer connections (browser to browser)
 ```
 
-The frontend is in `client/`. The backend is in `server/`.
+### Key directories
 
-- The React client renders the UI and calls the backend room API.
-- The Express server creates and validates room IDs using an in-memory store.
-- The media service provides upload, byte-range streaming, room playback, chat, and WebRTC signaling.
-- The React room UI connects to that service through `client/src/services/mediaSocket.js`.
-- Room IDs are passed into Socket.IO, so playback state and participants are isolated per room.
-- Chat messages are kept in memory for the room, with the latest 100 messages sent to new participants.
-- Meet media flows directly between browsers through WebRTC; Socket.IO only exchanges signaling messages.
+| Path | Purpose |
+|---|---|
+| `client/` | React + Vite frontend |
+| `server/` | Express room-registry API |
+| `src/mediaServer.cjs` | Socket.IO + media-streaming service |
+| `media/` | Uploaded files (runtime, not committed) |
+| `public/` | Static assets served by the media server |
+
+---
+
+## Features
+
+### Room Management
+
+- **Host** creates a room with a custom or auto-generated 6-character alphanumeric ID.
+- **Participants** join by entering the shared room ID and a display name.
+- Room IDs are validated for format (A-Z, 0-9, 4-10 characters).
+- If the host disconnects, all participants are redirected to the home page.
+
+### Synchronized Playback
+
+- Hosts (and co-hosts) upload **video** (`.mp4`, `.webm`, `.ogg`) or **audio** (`.mp3`, `.wav`, `.ogg`) files.
+- Files are streamed from the media server using **HTTP byte-range requests** for reliable seeking.
+- Play, pause, and seek events are broadcast to all room members via Socket.IO.
+- **NTP-style clock synchronisation** (`TIME_REQUEST` / `TIME_RESPONSE`) compensates for network latency so all clients share a common reference time.
+- **Soft drift correction** (`SYNC` events emitted every 800 ms by the controller):
+  - Drift **> 1.2 s** -- hard seek.
+  - Drift **<= 40 ms** -- no action (dead-band, prevents speed oscillation).
+  - Otherwise -- proportional `playbackRate` adjustment (+/-5%) for imperceptible catch-up/slow-down.
+  - `preservesPitch` is set to avoid audio artefacts during speed adjustment.
+
+### Playlist Queue
+
+- Multiple files can be uploaded and queued in a shared **playlist**.
+- Host/co-host can switch tracks, remove tracks, or let playback auto-advance to the next track when the current one ends.
+- Playlist state is broadcast to all participants in real time.
+
+### Co-Host Control Delegation
+
+- The host can grant or revoke **playback control** to any participant at any time via the Participants panel.
+- Co-hosts can play, pause, seek, switch tracks, upload files, and manage the playlist.
+- Participants without control see a read-only viewer view.
+
+### Real-Time Chat
+
+- In-room chat with messages displayed as `Name: message`.
+- Up to the latest **100 messages** are kept in memory and delivered to new joiners.
+- Client-side deduplication using `clientMessageId` prevents ghost messages on send.
+
+### Video Meet (WebRTC)
+
+- Triggered by the camera-icon button in the room header; opens as a floating overlay.
+- Can be dismissed without leaving the media room.
+- Each participant can toggle **camera** and **microphone** independently.
+- **Front/back camera switching** on mobile devices (`facingMode`).
+- Remote participants appear as video tiles with name labels.
+- Signaling is handled over the existing Socket.IO connection; media flows **peer-to-peer** via WebRTC (Google STUN server `stun.l.google.com:19302`).
+- A TURN server may be needed for participants behind restrictive NATs/firewalls.
+- The host can end the Meet for all participants.
+
+### Media Player UI
+
+- Docked **bottom-tab** player that can be expanded to a larger view or toggled to fullscreen.
+- **Accent colour picker** -- each user can personalise the player highlight colour locally.
+- Previous / Next track skip buttons appear when the playlist has more than one item.
+- Autoplay-blocked browsers show a manual "Start playback" prompt for participants.
+
+---
 
 ## Requirements
 
 - Node.js 18 or newer
 - npm
-- A modern browser with camera and microphone support for Meet
+- A modern browser (Chrome, Firefox, Edge, Safari) with camera/microphone support for Meet
 
-## Optional Supabase Setup
+---
 
-The current room API uses an in-memory store, so Supabase is not required for local development or the current runtime. The SQL schema is retained for a future persistent room registry. If you enable Supabase-backed persistence later, create `server/.env` from `server/.env.example`:
+## Optional Supabase Persistence
+
+The current room API uses an in-memory `Map`, so Supabase is **not required** for local development. `server/schema.sql` describes a Supabase table for a future persistent room registry. To enable it later, create `server/.env` from `server/.env.example`:
 
 ```env
 SUPABASE_URL=https://your-project.supabase.co
@@ -42,65 +108,61 @@ SUPABASE_SERVICE_ROLE_KEY=your-server-only-key
 PORT=3001
 ```
 
-Never commit `server/.env`. A service-role key must remain server-side.
+Never commit `server/.env`. The service-role key must remain server-side only.
+
+---
 
 ## Installation
 
 From the repository root:
 
 ```bash
-npm run install:all
-npm install
+npm run install:all   # installs client/ and server/ dependencies
+npm install           # installs root-level dependencies (concurrently, socket.io, multer)
 ```
 
-The root install provides `concurrently`, which runs the client and server together.
+---
 
 ## Development
 
-Start both applications from the repository root:
+Start all three services from the repository root:
 
 ```bash
 npm run dev
 ```
 
-URLs:
+| Service | Default URL |
+|---|---|
+| React frontend (Vite) | `http://localhost:5173` |
+| Room API (Express) | `http://localhost:3001` |
+| Media server (Socket.IO + streaming) | `http://localhost:3000` |
 
-- Frontend: `http://localhost:5173`
-- Backend health check: `http://localhost:3001/health`
-- Media server: `http://localhost:3000`
-
-To start them separately:
+To start each service individually:
 
 ```bash
-npm --prefix server run dev
-npm --prefix client run dev -- --host 0.0.0.0
-npm run media:dev
+npm --prefix server run dev                         # Room API
+npm --prefix client run dev -- --host 0.0.0.0       # React frontend (LAN accessible)
+npm run media:dev                                   # Media server (hot-reloads with --watch)
 ```
 
-If testing from another device on the same network, open the network URL printed by Vite. The frontend uses the current browser hostname for the local media server unless `VITE_MEDIA_URL` is set.
+If testing from another device on the same network, open the network URL printed by Vite. The frontend auto-detects the browser hostname for the local media server; override with `VITE_MEDIA_URL` if needed.
 
-For Meet camera and microphone access, use HTTPS in production. Localhost is allowed by browsers during development.
+For Meet camera and microphone access, browsers require HTTPS outside of localhost. Localhost is allowed during development; configure HTTPS or a reverse proxy in production.
+
+---
 
 ## Client Environment
 
-The client has an optional environment template at `client/.env.example`:
+Copy `client/.env.example` and customise if the services are hosted at non-default URLs:
 
 ```env
 VITE_API_URL=http://localhost:3001
 VITE_MEDIA_URL=http://localhost:3000
 ```
 
-Use both variables when the services are hosted at different URLs. Do not put Supabase secret keys in the client environment.
+Do **not** put any secret keys in the client environment -- they are exposed to the browser.
 
-## Room Features
-
-- Host and participant names are required when entering a room.
-- Hosts upload video or audio files and control synchronized play, pause, and seeking.
-- Participants receive room playback updates through Socket.IO.
-- **Soft Synchronization:** The system actively corrects playback drift by adjusting participant video speed smoothly, avoiding jarring skips.
-- Room chat displays messages as `Name: message` and keeps the latest 100 messages in memory.
-- Meet supports camera and microphone controls, front/back camera switching, remote video tiles, and host-controlled Meet ending.
-- WebRTC uses a public STUN server. A TURN server may be required for users behind restrictive networks.
+---
 
 ## Room API
 
@@ -108,6 +170,10 @@ Use both variables when the services are hosted at different URLs. Do not put Su
 
 ```http
 GET /health
+```
+
+```json
+{ "ok": true, "service": "play-together-server" }
 ```
 
 ### Create a room
@@ -122,82 +188,104 @@ Content-Type: application/json
 }
 ```
 
-The server returns `409` when the requested room ID already exists.
+`roomId` is optional -- a 6-character ID is auto-generated when omitted.
+
+Returns `201` with `{ "success": true, "roomId": "ABC123" }`.
+Returns `409` when the room ID already exists.
+Returns `400` for invalid room ID format.
 
 ### Validate a room
 
 ```http
-GET /api/rooms/ABC123/exists
+GET /api/rooms/:roomId/exists
 ```
-
-A valid response looks like:
 
 ```json
-{
-  "valid": true,
-  "exists": true
-}
+{ "valid": true, "exists": true }
 ```
 
-## Room Storage
+---
 
-The current API stores room records in memory, so rooms disappear when the API restarts. `server/schema.sql` describes the optional Supabase table for a future persistent implementation:
+## Room and Playback State
 
-- `id`: unique room ID
-- `host_id`: host identifier
-- `created_at`: creation timestamp
-- `is_active`: whether the room accepts joins
-- `participant_count`: current participant count placeholder for the realtime layer
+All state is held **in memory** in the media server process:
 
-The realtime media server also keeps playback, participants, chat history, and Meet signaling state in memory. Uploaded files are stored on the media service disk, so Render free-service storage should be treated as temporary.
+| State | Description |
+|---|---|
+| `media` | Filename of the currently playing track |
+| `playlist` | Ordered list of uploaded filenames |
+| `controllers` | Socket IDs with co-host control |
+| `position` | Playback position in seconds at last state change |
+| `playing` | Boolean play/pause flag |
+| `updatedAt` | Timestamp of last state change (used for live position calculation) |
+| `participants` | `[{ id, name }]` -- live room members |
+| `messages` | Latest 100 chat messages |
+
+Uploaded files are stored on disk under `media/`. On Render free-tier, ephemeral storage means files disappear on redeploy.
+
+---
 
 ## Production Build
 
-Build the client with:
+Build the React client:
 
 ```bash
 npm run build
 ```
 
-Start the API in production mode with:
+Output is written to `client/dist/` (not committed).
+
+Start the API in production mode:
 
 ```bash
 npm --prefix server start
 ```
 
-The client build output is generated in `client/dist/` and should not be committed.
+Start the media server in production mode:
+
+```bash
+npm run media:prod
+```
+
+---
 
 ## Deployment
 
-The recommended production layout is:
+Recommended layout:
 
-- Vercel: deploy the `client/` directory as the Vite frontend.
-- Render: deploy `server/` as the API service.
-- Render: deploy the repository root as the media and Socket.IO service.
+| Service | Platform | Source |
+|---|---|---|
+| React frontend | Vercel | `client/` directory |
+| Room API | Render (web service) | `server/` |
+| Media server | Render (web service) | Repository root (`npm run media:prod`) |
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the exact Render commands, Vercel settings, and production environment variables:
+Set these environment variables on Vercel for the client build:
 
 ```env
 VITE_API_URL=https://your-api-service.onrender.com
 VITE_MEDIA_URL=https://your-media-service.onrender.com
 ```
 
-Render supplies the production `PORT`, commonly `10000`; do not hardcode the local development ports in production.
+Render injects `PORT` automatically; do not hardcode `3000` or `3001` in production.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the exact Render commands and settings.
+
+---
 
 ## Git and Secrets
 
 The root `.gitignore` excludes:
 
-- environment files such as `.env`
-- dependency folders
-- build output
-- logs and local editor files
+- `server/.env` and all `.env` files
+- `node_modules/` folders
+- `client/dist/` build output
+- Uploaded `media/` files
+- Logs and editor files
 
-The committed environment templates are safe placeholders:
+Committed templates are safe placeholders:
 
 - `client/.env.example`
 - `server/.env.example`
+- `.env.production.example`
 
-Before pushing code, verify that `server/.env` is not listed by `git status`. If a service-role key has ever been committed or shared, revoke it in Supabase and create a replacement.
-
-The older `client/src/services/socket.js` mock service can remain for reference, but the room page uses `client/src/services/mediaSocket.js`.
+Before pushing, verify `server/.env` is not listed by `git status`. If a service-role key is ever exposed, revoke it in Supabase immediately and generate a replacement.
