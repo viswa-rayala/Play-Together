@@ -49,6 +49,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const [isVideo,     setIsVideo]     = useState(true)
   const [autoplayBlocked, setAutoplayBlocked] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [accentColor, setAccentColor] = useState('#6366f1')
   const prevPlayingRef  = useRef(playing)
   const prevSeekRef     = useRef(seekPosition)
@@ -225,64 +226,59 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   }
 
   return (
-    <div className="media-player" ref={playerShellRef} style={{ '--player-accent': accentColor }}>
-      {isVideo ? (
-        <div className="mp-video-shell">
-          <video {...sharedMediaProps} />
+    <div
+      className={`media-player ${isExpanded ? 'is-expanded' : 'is-bottom-tab'}`}
+      ref={playerShellRef}
+      style={{ '--player-accent': accentColor }}
+    >
+      {/* ── Left / Media area ── */}
+      <div className="mp-media-area">
+        {isVideo ? (
+          <div className="mp-video-shell" onClick={() => !isExpanded && setIsExpanded(true)}>
+            <video {...sharedMediaProps} />
 
-          <button className="mp-fullscreen-btn" onClick={toggleFullscreen} aria-label="Toggle fullscreen">
-            {isFullscreen ? '⤢' : '⤢'}
-          </button>
-        </div>
-      ) : (
-        <div className="mp-audio-wrapper">
-          <div className="mp-audio-card">
-            <div className="mp-audio-art">🎵</div>
-            <div className="mp-audio-info">
-              <span className="mp-audio-label">Now Playing</span>
-              <strong>{mediaName || 'Untitled song'}</strong>
-            </div>
+            <button
+              type="button"
+              className="mp-fullscreen-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleFullscreen()
+              }}
+              aria-label="Toggle fullscreen"
+              title="Fullscreen"
+            >
+              ⤢
+            </button>
+
+            {!isExpanded && (
+              <div className="mp-thumb-hover-hint" title="Click to expand video">
+                <span>⤢</span>
+              </div>
+            )}
           </div>
-          <audio {...sharedMediaProps} />
-        </div>
-      )}
+        ) : (
+          <div className="mp-audio-wrapper">
+            <div className="mp-audio-card">
+              <div className={`mp-audio-art ${playing ? 'playing' : ''}`}>🎵</div>
+              <div className="mp-audio-info">
+                <span className="mp-audio-label">Now Playing</span>
+                <strong title={mediaName}>{mediaName || 'Untitled song'}</strong>
+              </div>
+            </div>
+            <audio {...sharedMediaProps} />
+          </div>
+        )}
 
-      {/* ── Controls bar ── */}
+        <div className="mp-media-info-pill">
+          <span className="mp-media-name-txt" title={mediaName}>{mediaName || 'Untitled'}</span>
+          <span className={`mp-media-live-tag ${playing ? 'live' : 'paused'}`}>
+            {playing ? '▶ Playing' : '⏸ Paused'}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Center Controls area ── */}
       <div className="mp-controls">
-
-        {/* Progress / seek bar */}
-        <div className="mp-progress-row">
-          <span className="mp-time">{fmt(currentTime)}</span>
-          <input
-            id="media-seek-bar"
-            type="range"
-            className="mp-seek"
-            min={0}
-            max={duration || 0}
-            value={currentTime}
-            step={0.1}
-            style={{
-              background: `linear-gradient(to right, var(--primary) ${progressPct}%, var(--surface-2) ${progressPct}%)`
-            }}
-            onChange={handleSeekChange}
-            disabled={!userCanControl}
-            aria-label="Seek"
-          />
-          <span className="mp-time">{fmt(duration)}</span>
-        </div>
-
-        <div className="mp-color-row">
-          <label className="mp-color-picker">
-            <span>Accent</span>
-            <input
-              type="color"
-              value={accentColor}
-              onChange={(e) => setAccentColor(e.target.value)}
-              aria-label="Choose player accent color"
-            />
-          </label>
-        </div>
-
         {/* Playback action buttons for Host & Co-Hosts */}
         {userCanControl && !isFullscreen ? (
           <div className="mp-btn-row">
@@ -324,7 +320,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
           /* Participant read-only hint */
           !userCanControl && (
             <div className="mp-participant-hint">
-              👁 Viewer view — playback is controlled by the room host & co-hosts
+              👁 Viewer view — playback controlled by host & co-hosts
               {autoplayBlocked && (
                 <button className="btn btn-primary mp-autoplay-btn" onClick={handleParticipantStart}>
                   ▶ Start playback
@@ -333,6 +329,49 @@ const MediaPlayer = forwardRef(function MediaPlayer(
             </div>
           )
         )}
+
+        {/* Progress / seek bar */}
+        <div className="mp-progress-row">
+          <span className="mp-time">{fmt(currentTime)}</span>
+          <input
+            id="media-seek-bar"
+            type="range"
+            className="mp-seek"
+            min={0}
+            max={duration || 0}
+            value={currentTime}
+            step={0.1}
+            style={{
+              background: `linear-gradient(to right, var(--primary) ${progressPct}%, var(--surface-2) ${progressPct}%)`
+            }}
+            onChange={handleSeekChange}
+            disabled={!userCanControl}
+            aria-label="Seek"
+          />
+          <span className="mp-time">{fmt(duration)}</span>
+        </div>
+      </div>
+
+      {/* ── Right Action Tools ── */}
+      <div className="mp-tools-row">
+        <label className="mp-color-picker" title="Accent color">
+          <input
+            type="color"
+            value={accentColor}
+            onChange={(e) => setAccentColor(e.target.value)}
+            aria-label="Choose player accent color"
+          />
+        </label>
+
+        <button
+          type="button"
+          className="mp-expand-btn"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          title={isExpanded ? 'Minimize to bottom tab' : 'Expand player'}
+          aria-label={isExpanded ? 'Minimize to bottom tab' : 'Expand player'}
+        >
+          {isExpanded ? '− Tab' : '⤢ Expand'}
+        </button>
       </div>
     </div>
   )

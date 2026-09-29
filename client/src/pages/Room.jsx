@@ -32,6 +32,7 @@ function Room() {
   const [playlist,      setPlaylist]     = useState([])     // [{ name, url }]
   const [controllers,   setControllers]  = useState([])     // [socketId]
   const [myId,          setMyId]         = useState('')
+  const [hostId,        setHostId]       = useState('')
   const [uploadProgress, setUploadProgress] = useState(null)
   const [messages,       setMessages]       = useState([])
   const [playing,       setPlaying]      = useState(false)
@@ -54,6 +55,7 @@ function Room() {
       setPlaylist(s.playlist || [])
       setControllers(s.controllers || [])
       if (s.myId) setMyId(s.myId)
+      if (s.hostId) setHostId(s.hostId)
       setPlaying(s.playback.playing)
       if (s.playback.playing && s.serverTime) {
         const elapsed = Math.max(0, (mediaSocket.getServerTime() - s.serverTime) / 1000)
@@ -62,8 +64,14 @@ function Room() {
         setSeekPosition(s.playback.position)
       }
     }
-    const onParticipantJoined = ({ participants }) => setParticipants(participants)
-    const onParticipantLeft   = ({ participants }) => setParticipants(participants)
+    const onParticipantJoined = (data) => {
+      if (data?.participants) setParticipants(data.participants)
+      if (data?.hostId) setHostId(data.hostId)
+    }
+    const onParticipantLeft   = (data) => {
+      if (data?.participants) setParticipants(data.participants)
+      if (data?.hostId) setHostId(data.hostId)
+    }
     const onChatMessage = (message) => setMessages((current) => (
       current.some((item) => item.id === message.id)
         ? current
@@ -225,16 +233,24 @@ function Room() {
       <header className="room-header">
         <span className="room-logo">▶ Play Together</span>
         <div className="room-header-right">
-          {/* Small camera / video meet toggle button right before connection status */}
+          {/* WhatsApp style video camera icon button right before connection status */}
           <button
             id="btn-toggle-meet"
             className={`room-cam-btn ${showMeet ? 'active' : ''}`}
             onClick={() => setShowMeet((prev) => !prev)}
-            title={showMeet ? 'Close Video Meet' : 'Open Video Meet'}
-            aria-label="Toggle Video Meet"
+            title={showMeet ? 'Close Video Call' : 'Start Video Call'}
+            aria-label="Toggle Video Call"
           >
-            <span className="cam-icon">📹</span>
-            <span className="cam-label">Meet</span>
+            <svg
+              className="cam-whatsapp-icon"
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M16 7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h11c.55 0 1-.45 1-1v-3.5l4 3.5c.37.33.95.07.95-.42V7.42c0-.49-.58-.75-.95-.42L16 10.5V7z" />
+            </svg>
           </button>
 
           <ConnectionStatus status={connStatus} />
@@ -274,6 +290,9 @@ function Room() {
                 uploadProgress={uploadProgress}
                 participants={participants}
                 controllers={controllers}
+                hostId={hostId || (isHost ? myId : null)}
+                isHost={isHost}
+                myId={myId}
                 onFileSelect={handleFileSelect}
                 onSelectPlaylistItem={handleSelectPlaylistItem}
                 onRemovePlaylistItem={handleRemovePlaylistItem}
@@ -304,37 +323,59 @@ function Room() {
 
         {/* ── Player area ── */}
         <main className="room-player">
-          <div className="room-player-content">
-          {!media ? (
-            <div className="no-media">
-              <span className="no-media-icon">{hasControl ? '📂' : '⏳'}</span>
-              <p className="no-media-title">
-                {hasControl ? 'No file selected yet' : 'Waiting for host…'}
-              </p>
-              <p className="no-media-sub">
-                {hasControl
-                  ? 'Use the "Add Media Files" button in the sidebar to choose video or audio tracks.'
-                  : 'The host hasn\'t selected a media file yet. Hang tight!'}
-              </p>
-            </div>
-          ) : (
-            <MediaPlayer
-              ref={playerRef}
-              src={media.url}
-              mediaName={media.name}
-              isHost={isHost}
-              hasControl={hasControl}
-              playlist={playlist}
-              playing={playing}
-              seekPosition={seekPosition}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onSeek={handleSeek}
-              onSync={handleSync}
-              onNextTrack={handleNextTrack}
-              onPrevTrack={handlePrevTrack}
-            />
-          )}
+          <div className="room-player-stage">
+            {!media ? (
+              <div className="no-media">
+                <span className="no-media-icon">{hasControl ? '📂' : '⏳'}</span>
+                <p className="no-media-title">
+                  {hasControl ? 'No file selected yet' : 'Waiting for host…'}
+                </p>
+                <p className="no-media-sub">
+                  {hasControl
+                    ? 'Use the "+ Add Songs / Videos" button in the sidebar to choose video or audio tracks.'
+                    : 'The host hasn\'t selected a media file yet. Hang tight!'}
+                </p>
+              </div>
+            ) : (
+              <div className="stage-ambient-card">
+                <div className="stage-ambient-glow" />
+                <span className="stage-badge">▶ Playing in Bottom Tab</span>
+                <h2 className="stage-title">{media.name}</h2>
+                <p className="stage-sub">
+                  Playback controls are available in the small tab at the bottom
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Small media player tab at the bottom ── */}
+          <div className="room-bottom-dock">
+            {media ? (
+              <MediaPlayer
+                ref={playerRef}
+                src={media.url}
+                mediaName={media.name}
+                isHost={isHost}
+                hasControl={hasControl}
+                playlist={playlist}
+                playing={playing}
+                seekPosition={seekPosition}
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onSeek={handleSeek}
+                onSync={handleSync}
+                onNextTrack={handleNextTrack}
+                onPrevTrack={handlePrevTrack}
+              />
+            ) : (
+              <div className="mp-tab-empty-bar">
+                <div className="mp-tab-empty-info">
+                  <span className="mp-tab-empty-icon">🎵</span>
+                  <span className="mp-tab-empty-text">No track playing</span>
+                </div>
+                <span className="mp-tab-empty-hint">Upload or select songs/videos from sidebar</span>
+              </div>
+            )}
           </div>
         </main>
       </div>

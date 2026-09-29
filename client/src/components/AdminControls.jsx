@@ -23,6 +23,9 @@ function AdminControls({
   uploadProgress,
   participants = [],
   controllers = [],
+  hostId,
+  isHost,
+  myId,
   onFileSelect,
   onSelectPlaylistItem,
   onRemovePlaylistItem,
@@ -143,35 +146,51 @@ function AdminControls({
         ) : (
           <ul className="ac-participant-list">
             {participants.map((p) => {
-              const isCoHost = controllers.includes(p.id)
+              const isThisHost = Boolean(p.isHost || (hostId && p.id === hostId) || (isHost && p.id === myId))
+              const isCoHost = !isThisHost && controllers.includes(p.id)
               return (
-                <li key={p.id} className={`ac-participant-row ${isCoHost ? 'is-cohost' : ''}`}>
+                <li
+                  key={p.id}
+                  className={`ac-participant-row ${isThisHost ? 'is-host' : isCoHost ? 'is-cohost' : ''}`}
+                >
                   <div className="ac-participant-info">
                     <span className="ac-participant-name" title={p.id}>
                       {p.name}
                     </span>
-                    {isCoHost && <span className="ac-cohost-badge">🎮 Co-Host</span>}
+                    {isThisHost ? (
+                      <span className="ac-host-badge">👑 Host</span>
+                    ) : isCoHost ? (
+                      <span className="ac-cohost-badge">🎮 Co-Host</span>
+                    ) : null}
                   </div>
 
                   <div className="ac-participant-actions">
-                    <button
-                      type="button"
-                      className={`ac-control-toggle-btn ${isCoHost ? 'active' : ''}`}
-                      onClick={() => onToggleControl?.(p.id)}
-                      title={isCoHost ? `Revoke playback control from ${p.name}` : `Give playback control to ${p.name}`}
-                    >
-                      {isCoHost ? 'Revoke Control' : 'Give Control'}
-                    </button>
+                    {!isThisHost && (
+                      <>
+                        <button
+                          type="button"
+                          className={`ac-control-toggle-btn ${isCoHost ? 'active' : ''}`}
+                          onClick={() => onToggleControl?.(p.id)}
+                          title={
+                            isCoHost
+                              ? `Revoke playback control from ${p.name}`
+                              : `Give playback control to ${p.name}`
+                          }
+                        >
+                          {isCoHost ? 'Revoke Control' : 'Give Control'}
+                        </button>
 
-                    <button
-                      type="button"
-                      className="ac-kick-btn"
-                      onClick={() => onRemoveParticipant?.(p.id)}
-                      aria-label={`Remove ${p.name}`}
-                      title={`Kick ${p.name}`}
-                    >
-                      ✕
-                    </button>
+                        <button
+                          type="button"
+                          className="ac-kick-btn"
+                          onClick={() => onRemoveParticipant?.(p.id)}
+                          aria-label={`Remove ${p.name}`}
+                          title={`Kick ${p.name}`}
+                        >
+                          ✕
+                        </button>
+                      </>
+                    )}
                   </div>
                 </li>
               )

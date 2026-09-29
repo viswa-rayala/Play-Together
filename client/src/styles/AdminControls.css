@@ -203,6 +203,11 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
+.ac-participant-row.is-host {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+}
+
 .ac-participant-row.is-cohost {
   border-color: color-mix(in srgb, #f59e0b 60%, var(--border));
   background: color-mix(in srgb, #f59e0b 10%, var(--surface-2));
@@ -225,11 +230,24 @@
   text-overflow: ellipsis;
 }
 
+.ac-host-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .ac-cohost-badge {
   font-size: 0.65rem;
   font-weight: 700;
   color: #f59e0b;
   letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .ac-participant-actions {

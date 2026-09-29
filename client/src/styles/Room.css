@@ -32,46 +32,39 @@
   gap: 14px;
 }
 
-/* ── Camera / Meet toggle button in header ── */
+/* ── Camera / Meet WhatsApp style button in header ── */
 .room-cam-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
   background: var(--surface-2, rgba(255, 255, 255, 0.06));
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
   color: var(--text);
-  font-size: 0.82rem;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .room-cam-btn:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  background: #25D366;
+  border-color: #25D366;
+  color: #ffffff;
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.4);
 }
 
 .room-cam-btn.active {
-  background: color-mix(in srgb, var(--primary) 22%, transparent);
-  border-color: var(--primary);
-  color: var(--primary);
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+  background: #25D366;
+  border-color: #25D366;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(37, 211, 102, 0.5);
 }
 
-.room-cam-btn .cam-icon {
-  font-size: 0.95rem;
-  display: inline-block;
-  line-height: 1;
-}
-
-.room-cam-btn .cam-label {
-  font-size: 0.8rem;
-  letter-spacing: 0.02em;
+.room-cam-btn .cam-whatsapp-icon {
+  display: block;
 }
 
 /* ── Meet Overlay Modal ── */
@@ -135,23 +128,124 @@
   margin: 20px 0;
 }
 
-/* ── Player area ── */
+/* ── Player area with small bottom player dock ── */
 .room-player {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  background: var(--bg);
+  position: relative;
+}
+
+.room-player-stage {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px;
-  overflow: auto;
-  background: var(--bg);
+  padding: 24px;
+  overflow-y: auto;
 }
 
-.room-player-content {
-  width: min(100%, 980px);
+.room-bottom-dock {
+  width: 100%;
+  flex-shrink: 0;
+  z-index: 30;
+}
+
+/* Ambient Stage Card */
+.stage-ambient-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  text-align: center;
+  gap: 12px;
+  padding: 36px 28px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  max-width: 460px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.25);
+}
+
+.stage-ambient-glow {
+  position: absolute;
+  top: -50px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+  filter: blur(28px);
+  opacity: 0.35;
+}
+
+.stage-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  padding: 4px 12px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+
+.stage-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* Empty Tab Bar */
+.mp-tab-empty-bar {
+  width: 100%;
+  height: 78px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+}
+
+.mp-tab-empty-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mp-tab-empty-icon {
+  font-size: 1.25rem;
+  opacity: 0.55;
+}
+
+.mp-tab-empty-text {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.mp-tab-empty-hint {
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }
 
 /* ── No media placeholder ── */

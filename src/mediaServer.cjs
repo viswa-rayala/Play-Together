@@ -256,6 +256,12 @@ io.on("connection", socket => {
     const participantName = String(socket.handshake.auth?.name || "Participant").trim() || "Participant";
     let hostId = hostIds.get(roomId) || null;
 
+    if (!hostId && socket.handshake.auth?.isHost === true) {
+        hostId = socket.id;
+        hostIds.set(roomId, hostId);
+        console.log("Host assigned:", hostId);
+    }
+
     socket.join(roomId);
     roomState.participants.push({ id: socket.id, name: participantName });
 
@@ -263,16 +269,14 @@ io.on("connection", socket => {
         "Client connected:", socket.id, "Room:", roomId, "Name:", participantName
     );
 
-    if (!hostId && socket.handshake.auth?.isHost === true) {
-
-        hostId = socket.id;
-        hostIds.set(roomId, hostId);
-
-        console.log(
-            "Host assigned:",
-            hostId
-        );
-    }
+    const getParticipantsWithRole = () => {
+        const currentHost = hostIds.get(roomId);
+        return roomState.participants.map(p => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.id === currentHost
+        }));
+    };
 
     socket.emit(
         "ROOM_STATE",
@@ -288,15 +292,20 @@ io.on("connection", socket => {
                 Date.now(),
             isHost:
                 socket.id === hostId,
+            hostId:
+                hostId,
             hasControl:
                 canControl(roomId, socket.id),
             myId:
-                socket.id
+                socket.id,
+            participants:
+                getParticipantsWithRole()
         }
     );
 
     io.to(roomId).emit("PARTICIPANT_JOINED", {
-        participants: roomState.participants
+        participants: getParticipantsWithRole(),
+        hostId: hostId
     });
 
     socket.emit("MEET_PEERS", {
@@ -665,8 +674,15 @@ io.on("connection", socket => {
         }
 
         removeParticipant(roomState, socket.id);
+        const currentHost = hostIds.get(roomId);
+        const participantsWithRole = roomState.participants.map(p => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.id === currentHost
+        }));
         socket.to(roomId).emit("PARTICIPANT_LEFT", {
-            participants: roomState.participants
+            participants: participantsWithRole,
+            hostId: currentHost
         });
         io.to(roomId).emit("CONTROLLERS_UPDATED", {
             controllers: roomState.controllers
@@ -683,9 +699,16 @@ io.on("connection", socket => {
             );
 
             removeParticipant(roomState, socket.id);
+            const remainingHost = hostIds.get(roomId);
+            const remainingParticipants = roomState.participants.map(p => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.id === remainingHost
+            }));
 
             socket.to(roomId).emit("PARTICIPANT_LEFT", {
-                participants: roomState.participants
+                participants: remainingParticipants,
+                hostId: remainingHost
             });
             socket.to(roomId).emit("MEET_PEER_LEFT", { id: socket.id });
             io.to(roomId).emit("CONTROLLERS_UPDATED", {

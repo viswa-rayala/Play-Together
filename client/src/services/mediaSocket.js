@@ -66,7 +66,11 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('ROOM_STATE', (state) => {
     emit('ROOM_STATE', {
       messages: state.messages || [],
-      participants: state.participants || [],
+      participants: (state.participants || []).map((p) => ({
+        ...p,
+        isHost: Boolean(p.isHost || (state.hostId && p.id === state.hostId)),
+      })),
+      hostId: state.hostId || null,
       media: state.media ? { name: state.media, url: mediaUrl(state.media) } : null,
       playlist: (state.playlist || []).map((item) => ({ name: item, url: mediaUrl(item) })),
       controllers: state.controllers || [],
