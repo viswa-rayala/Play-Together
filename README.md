@@ -289,3 +289,8 @@ Committed templates are safe placeholders:
 - `.env.production.example`
 
 Before pushing, verify `server/.env` is not listed by `git status`. If a service-role key is ever exposed, revoke it in Supabase immediately and generate a replacement.
+
+---
+
+> **Note on "No Internet Required" (LAN Compatibility)**  
+> Play Together is designed so that it can run entirely on a Local Area Network (LAN). If you host the API and Media server locally (`npm run dev`), devices on the same WiFi network can connect using your local IP address. Media streaming and WebRTC video calls will route directly over your local router at maximum local speeds, without consuming any internet bandwidth.
