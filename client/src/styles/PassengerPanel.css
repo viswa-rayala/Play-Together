@@ -1,9 +1,54 @@
-/* PassengerPanel.css — styles for the passenger-only sidebar panel */
+/* PassengerPanel.css — styles for the passenger sidebar panel */
 
 .passenger-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+}
+
+/* ── Status Banners ─────────────────────────────────────────────── */
+.pp-cohost-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 22%, transparent), color-mix(in srgb, var(--primary) 18%, transparent));
+  border: 1px solid color-mix(in srgb, #f59e0b 60%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  box-shadow: 0 4px 16px color-mix(in srgb, #f59e0b 15%, transparent);
+}
+
+.pp-cohost-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.pp-cohost-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pp-cohost-text strong {
+  font-size: 0.82rem;
+  color: #fbbf24;
+}
+
+.pp-cohost-text span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.pp-viewer-banner {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 /* ── Room ID display ────────────────────────────────────────────── */
@@ -15,6 +60,9 @@
 
 .pp-label {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -22,25 +70,152 @@
   color: var(--text-muted);
 }
 
+.pp-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
 .pp-room-id {
   font-family: 'Courier New', monospace;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   color: var(--primary);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 12px 16px;
+  padding: 10px 14px;
   text-align: center;
-  user-select: all;       /* lets the passenger still copy it manually */
+  user-select: all;
   word-break: break-all;
+}
+
+/* ── Playlist & Queue in Passenger Panel ───────────────────────── */
+.pp-playlist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pp-upload-btn {
+  font-size: 0.72rem;
+  padding: 4px 8px;
+}
+
+.pp-empty-hint {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 8px 0;
+  margin: 0;
+}
+
+.pp-playlist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.pp-playlist-list::-webkit-scrollbar { width: 4px; }
+.pp-playlist-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.pp-playlist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px 4px 8px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.pp-playlist-item.active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface-2));
+}
+
+.pp-playlist-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 4px 0;
+}
+
+.pp-playlist-item.clickable .pp-playlist-btn {
+  cursor: pointer;
+}
+
+.pp-playlist-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.pp-playlist-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.pp-active-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.pp-item-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.pp-item-del-btn:hover {
+  color: hsl(0 75% 65%);
+  background: hsl(0 70% 50% / 0.15);
 }
 
 /* ── Leave button ───────────────────────────────────────────────── */
 .pp-leave-btn {
   width: 100%;
-  padding: 12px;
-  font-size: 0.92rem;
+  padding: 10px;
+  font-size: 0.88rem;
   font-weight: 600;
 }

@@ -68,16 +68,33 @@ export function connect(roomId, isHost, participantName = 'Participant') {
       messages: state.messages || [],
       participants: state.participants || [],
       media: state.media ? { name: state.media, url: mediaUrl(state.media) } : null,
+      playlist: (state.playlist || []).map((item) => ({ name: item, url: mediaUrl(item) })),
+      controllers: state.controllers || [],
       playback: {
         playing: Boolean(state.playing),
         position: Number(state.position) || 0,
       },
       serverTime: state.serverTime,
+      isHost: Boolean(state.isHost),
+      hasControl: Boolean(state.hasControl),
+      myId: state.myId || socket.id,
     })
   })
 
-  socket.on('MEDIA_SELECTED', ({ media }) => {
-    emit('MEDIA_SELECTED', { media: { name: media, url: mediaUrl(media) } })
+  socket.on('MEDIA_SELECTED', ({ media, playlist }) => {
+    emit('MEDIA_SELECTED', {
+      media: media ? { name: media, url: mediaUrl(media) } : null,
+      playlist: (playlist || []).map((item) => ({ name: item, url: mediaUrl(item) })),
+    })
+  })
+  socket.on('PLAYLIST_UPDATED', ({ playlist, media }) => {
+    emit('PLAYLIST_UPDATED', {
+      media: media ? { name: media, url: mediaUrl(media) } : null,
+      playlist: (playlist || []).map((item) => ({ name: item, url: mediaUrl(item) })),
+    })
+  })
+  socket.on('CONTROLLERS_UPDATED', ({ controllers }) => {
+    emit('CONTROLLERS_UPDATED', { controllers: controllers || [] })
   })
   socket.on('PLAY', ({ position, serverTime }) => emit('PLAY', { position, serverTime }))
   socket.on('PLAY_CONFIRMED', ({ position }) => emit('PLAY', { position }))
@@ -95,9 +112,16 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('HOST_DISCONNECTED', () => emit('HOST_DISCONNECTED', {}))
 }
 
-export function uploadMedia(file, onProgress) {
+export function uploadMedia(fileOrFiles, onProgress) {
   const formData = new FormData()
-  formData.append('media', file)
+  const files = Array.isArray(fileOrFiles)
+    ? fileOrFiles
+    : (fileOrFiles instanceof FileList ? Array.from(fileOrFiles) : [fileOrFiles])
+
+  files.filter(Boolean).forEach((file) => {
+    formData.append('media', file)
+  })
+
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
     request.open('POST', `${MEDIA_URL}/upload`)
@@ -113,12 +137,25 @@ export function uploadMedia(file, onProgress) {
         return
       }
       onProgress?.(1)
-      resolve({ name: data.media, url: mediaUrl(data.media) })
+      const primaryMedia = data.media || (Array.isArray(data.files) ? data.files[0] : null)
+      const uploadedFiles = (data.files || (primaryMedia ? [primaryMedia] : [])).map((item) => ({
+        name: item,
+        url: mediaUrl(item),
+      }))
+      resolve({
+        name: primaryMedia,
+        url: primaryMedia ? mediaUrl(primaryMedia) : '',
+        files: uploadedFiles,
+      })
     })
     request.addEventListener('error', () => reject(new Error('Media upload failed.')))
     request.addEventListener('abort', () => reject(new Error('Media upload was cancelled.')))
     request.send(formData)
   })
+}
+
+export function getMyId() {
+  return socket?.id || null
 }
 
 export function disconnect() {
@@ -143,6 +180,12 @@ export function sendPause(position) { socket?.emit('PAUSE', { position }) }
 export function sendSeek(position) { socket?.emit('SEEK', { position }) }
 export function sendSync(position, playing) { socket?.emit('SYNC', { position, playing }) }
 export function sendMediaSelected(name) { socket?.emit('MEDIA_SELECTED', { media: name }) }
+export function sendPlaylistUpdate(playlist) { socket?.emit('PLAYLIST_UPDATE', { playlist }) }
+export function sendAddToPlaylist(items, selectFirst = false) {
+  socket?.emit('ADD_TO_PLAYLIST', { items: Array.isArray(items) ? items : [items], selectFirst })
+}
+export function sendRemoveFromPlaylist(name) { socket?.emit('REMOVE_FROM_PLAYLIST', { name }) }
+export function sendToggleControl(targetId, grant) { socket?.emit('TOGGLE_CONTROL', { targetId, grant }) }
 export function sendChatMessage(message, clientMessageId) {
   socket?.emit('CHAT_MESSAGE', { message, clientMessageId })
 }
@@ -154,6 +197,8 @@ export function sendMeetEnd() { socket?.emit('MEET_END') }
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,
-  syncClock, getServerTime,
-  sendPlay, sendPause, sendSeek, sendSync, sendMediaSelected, sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
+  syncClock, getServerTime, getMyId,
+  sendPlay, sendPause, sendSeek, sendSync, sendMediaSelected,
+  sendPlaylistUpdate, sendAddToPlaylist, sendRemoveFromPlaylist, sendToggleControl,
+  sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
 }

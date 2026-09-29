@@ -32,6 +32,8 @@ function getRoomState(roomId) {
     if (!roomStates.has(roomId)) {
         roomStates.set(roomId, {
             media: "",
+            playlist: [],
+            controllers: [],
             position: 0,
             playing: false,
             updatedAt: Date.now(),
@@ -41,6 +43,13 @@ function getRoomState(roomId) {
     }
 
     return roomStates.get(roomId);
+}
+
+function canControl(roomId, socketId) {
+    const hostId = hostIds.get(roomId);
+    if (socketId === hostId) return true;
+    const roomState = getRoomState(roomId);
+    return Array.isArray(roomState.controllers) && roomState.controllers.includes(socketId);
 }
 
 app.use((req, res, next) => {
@@ -57,37 +66,35 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
-app.post("/upload", upload.single("media"), (req, res) => {
+app.post("/upload", upload.any(), (req, res) => {
+    const files = req.files || (req.file ? [req.file] : []);
 
-    if (!req.file) {
+    if (!files || files.length === 0) {
         return res.status(400).json({
             error: "No media file selected"
         });
     }
 
-    const originalName =
-        path.basename(req.file.originalname);
+    const savedMedia = [];
 
-    const finalPath =
-        path.join(mediaPath, originalName);
+    for (const file of files) {
+        const originalName = path.basename(file.originalname);
+        const finalPath = path.join(mediaPath, originalName);
 
-    if (fs.existsSync(finalPath)) {
-        fs.unlinkSync(req.file.path);
-    } else {
-        fs.renameSync(
-            req.file.path,
-            finalPath
-        );
+        if (fs.existsSync(finalPath)) {
+            try { fs.unlinkSync(file.path); } catch (e) {}
+        } else {
+            try { fs.renameSync(file.path, finalPath); } catch (e) {}
+        }
+        savedMedia.push(originalName);
     }
 
-    console.log(
-        "Media uploaded:",
-        originalName
-    );
+    console.log("Media uploaded:", savedMedia);
 
     res.json({
         success: true,
-        media: originalName
+        media: savedMedia[0],
+        files: savedMedia
     });
 });
 
@@ -223,12 +230,19 @@ function removeParticipant(roomState, socketId) {
     roomState.participants = roomState.participants.filter(
         participant => participant.id !== socketId
     );
+    if (Array.isArray(roomState.controllers)) {
+        roomState.controllers = roomState.controllers.filter(
+            id => id !== socketId
+        );
+    }
 }
 
 function endRoom(roomId, roomState) {
     roomState.playing = false;
     roomState.position = 0;
     roomState.media = "";
+    roomState.playlist = [];
+    roomState.controllers = [];
     roomState.updatedAt = Date.now();
     roomState.participants = [];
     roomState.messages = [];
@@ -264,6 +278,8 @@ io.on("connection", socket => {
         "ROOM_STATE",
         {
             media: roomState.media,
+            playlist: roomState.playlist || [],
+            controllers: roomState.controllers || [],
             messages: roomState.messages,
             position: getCurrentPosition(roomState),
             playing:
@@ -271,7 +287,11 @@ io.on("connection", socket => {
             serverTime:
                 Date.now(),
             isHost:
-                socket.id === hostId
+                socket.id === hostId,
+            hasControl:
+                canControl(roomId, socket.id),
+            myId:
+                socket.id
         }
     );
 
@@ -356,21 +376,53 @@ io.on("connection", socket => {
         }
     });
 
+    // Toggle control permissions for participants (Host only)
+    socket.on("TOGGLE_CONTROL", data => {
+        const currentHost = hostIds.get(roomId);
+        if (socket.id !== currentHost) return;
+        const targetId = String(data?.targetId || "");
+        if (!targetId || targetId === currentHost) return;
+
+        if (!Array.isArray(roomState.controllers)) {
+            roomState.controllers = [];
+        }
+
+        const isCurrentlyController = roomState.controllers.includes(targetId);
+        const shouldGrant = data?.grant !== undefined ? Boolean(data.grant) : !isCurrentlyController;
+
+        if (shouldGrant) {
+            if (!isCurrentlyController) roomState.controllers.push(targetId);
+        } else {
+            roomState.controllers = roomState.controllers.filter(id => id !== targetId);
+        }
+
+        console.log(`Controllers updated in room ${roomId}:`, roomState.controllers);
+        io.to(roomId).emit("CONTROLLERS_UPDATED", {
+            controllers: roomState.controllers
+        });
+    });
+
+    // Select active media
     socket.on(
         "MEDIA_SELECTED",
         data => {
 
-            if (socket.id !== hostId) {
+            if (!canControl(roomId, socket.id)) {
                 return;
             }
 
+            const selected = String(data?.media || "").trim();
             console.log(
                 "MEDIA_SELECTED:",
-                data
+                selected
             );
 
             roomState.media =
-                data.media;
+                selected;
+
+            if (selected && !roomState.playlist.includes(selected)) {
+                roomState.playlist.push(selected);
+            }
 
             roomState.position =
                 0;
@@ -381,21 +433,96 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
-            socket.to(roomId).emit(
+            io.to(roomId).emit(
                 "MEDIA_SELECTED",
                 {
                     media:
-                        roomState.media
+                        roomState.media,
+                    playlist:
+                        roomState.playlist
                 }
             );
         }
     );
 
+    // Playlist update
+    socket.on("PLAYLIST_UPDATE", data => {
+        if (!canControl(roomId, socket.id)) return;
+        if (Array.isArray(data?.playlist)) {
+            roomState.playlist = data.playlist.map(item => String(item).trim()).filter(Boolean);
+            if (!roomState.media && roomState.playlist.length > 0) {
+                roomState.media = roomState.playlist[0];
+                roomState.position = 0;
+                roomState.playing = false;
+                roomState.updatedAt = Date.now();
+            }
+            io.to(roomId).emit("PLAYLIST_UPDATED", {
+                playlist: roomState.playlist,
+                media: roomState.media
+            });
+        }
+    });
+
+    // Add items to playlist
+    socket.on("ADD_TO_PLAYLIST", data => {
+        if (!canControl(roomId, socket.id)) return;
+        const newItems = Array.isArray(data?.items) ? data.items : (data?.item ? [data.item] : []);
+        let changed = false;
+
+        for (const item of newItems) {
+            const name = String(item).trim();
+            if (name && !roomState.playlist.includes(name)) {
+                roomState.playlist.push(name);
+                changed = true;
+            }
+        }
+
+        if (!roomState.media && roomState.playlist.length > 0) {
+            roomState.media = roomState.playlist[0];
+            roomState.position = 0;
+            roomState.playing = false;
+            roomState.updatedAt = Date.now();
+            changed = true;
+        }
+
+        if (changed || data?.selectFirst) {
+            if (data?.selectFirst && newItems.length > 0) {
+                roomState.media = String(newItems[0]).trim();
+                roomState.position = 0;
+                roomState.playing = false;
+                roomState.updatedAt = Date.now();
+            }
+            io.to(roomId).emit("PLAYLIST_UPDATED", {
+                playlist: roomState.playlist,
+                media: roomState.media
+            });
+        }
+    });
+
+    // Remove item from playlist
+    socket.on("REMOVE_FROM_PLAYLIST", data => {
+        if (!canControl(roomId, socket.id)) return;
+        const name = String(data?.name || "").trim();
+        roomState.playlist = roomState.playlist.filter(item => item !== name);
+
+        if (roomState.media === name) {
+            roomState.media = roomState.playlist.length > 0 ? roomState.playlist[0] : "";
+            roomState.position = 0;
+            roomState.playing = false;
+            roomState.updatedAt = Date.now();
+        }
+
+        io.to(roomId).emit("PLAYLIST_UPDATED", {
+            playlist: roomState.playlist,
+            media: roomState.media
+        });
+    });
+
     socket.on(
         "PLAY",
         data => {
 
-            if (socket.id !== hostId) {
+            if (!canControl(roomId, socket.id)) {
                 return;
             }
 
@@ -439,7 +566,7 @@ io.on("connection", socket => {
         "PAUSE",
         data => {
 
-            if (socket.id !== hostId) {
+            if (!canControl(roomId, socket.id)) {
                 return;
             }
 
@@ -471,7 +598,7 @@ io.on("connection", socket => {
         "SEEK",
         data => {
 
-            if (socket.id !== hostId) {
+            if (!canControl(roomId, socket.id)) {
                 return;
             }
 
@@ -500,7 +627,7 @@ io.on("connection", socket => {
         "SYNC",
         data => {
 
-            if (socket.id !== hostId) {
+            if (!canControl(roomId, socket.id)) {
                 return;
             }
 
@@ -541,6 +668,9 @@ io.on("connection", socket => {
         socket.to(roomId).emit("PARTICIPANT_LEFT", {
             participants: roomState.participants
         });
+        io.to(roomId).emit("CONTROLLERS_UPDATED", {
+            controllers: roomState.controllers
+        });
     });
 
     socket.on(
@@ -558,6 +688,9 @@ io.on("connection", socket => {
                 participants: roomState.participants
             });
             socket.to(roomId).emit("MEET_PEER_LEFT", { id: socket.id });
+            io.to(roomId).emit("CONTROLLERS_UPDATED", {
+                controllers: roomState.controllers
+            });
 
             if (socket.id === hostId) {
 

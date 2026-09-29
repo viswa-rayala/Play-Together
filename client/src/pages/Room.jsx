@@ -29,21 +29,31 @@ function Room() {
   const [connStatus,    setConnStatus]   = useState('connecting')
   const [participants,  setParticipants] = useState([])  // [{id, name}]
   const [media,         setMedia]        = useState(null)   // { name, url }
+  const [playlist,      setPlaylist]     = useState([])     // [{ name, url }]
+  const [controllers,   setControllers]  = useState([])     // [socketId]
+  const [myId,          setMyId]         = useState('')
   const [uploadProgress, setUploadProgress] = useState(null)
   const [messages,       setMessages]       = useState([])
   const [playing,       setPlaying]      = useState(false)
   const [seekPosition,  setSeekPosition] = useState(0)
+  const [showMeet,      setShowMeet]     = useState(false)
 
   const playerRef = useRef(null)
+
+  // A user has control if they are the Room Host or have been granted Co-Host control
+  const hasControl = isHost || (Boolean(myId) && controllers.includes(myId))
 
   // ── Socket setup ──────────────────────────────────────────────────────────
   useEffect(() => {
     // Named handlers so we can remove them on cleanup
     const onConnStatus      = ({ status }) => setConnStatus(status)
     const onRoomState       = (s) => {
-      setParticipants(s.participants)          // now an array
+      setParticipants(s.participants || [])
       setMessages(s.messages || [])
-      if (s.media) setMedia(s.media)
+      setMedia(s.media || null)
+      setPlaylist(s.playlist || [])
+      setControllers(s.controllers || [])
+      if (s.myId) setMyId(s.myId)
       setPlaying(s.playback.playing)
       if (s.playback.playing && s.serverTime) {
         const elapsed = Math.max(0, (mediaSocket.getServerTime() - s.serverTime) / 1000)
@@ -79,7 +89,17 @@ function Room() {
         setSeekPosition(position)
       }
     }
-    const onMediaSelected = ({ media }) => setMedia(media)
+    const onMediaSelected = ({ media, playlist }) => {
+      if (media !== undefined) setMedia(media)
+      if (playlist) setPlaylist(playlist)
+    }
+    const onPlaylistUpdated = ({ playlist, media }) => {
+      if (playlist) setPlaylist(playlist)
+      if (media !== undefined) setMedia(media)
+    }
+    const onControllersUpdated = ({ controllers }) => {
+      setControllers(controllers || [])
+    }
     const onHostDisconnected = () => {
       mediaSocket.disconnect()
       navigate('/')
@@ -95,6 +115,8 @@ function Room() {
     mediaSocket.on('SEEK',               onSeek)
     mediaSocket.on('SYNC',               onSync)
     mediaSocket.on('MEDIA_SELECTED',     onMediaSelected)
+    mediaSocket.on('PLAYLIST_UPDATED',   onPlaylistUpdated)
+    mediaSocket.on('CONTROLLERS_UPDATED', onControllersUpdated)
     mediaSocket.on('HOST_DISCONNECTED',  onHostDisconnected)
 
     // Connect to room
@@ -112,26 +134,63 @@ function Room() {
       mediaSocket.off('SEEK',               onSeek)
       mediaSocket.off('SYNC',               onSync)
       mediaSocket.off('MEDIA_SELECTED',     onMediaSelected)
+      mediaSocket.off('PLAYLIST_UPDATED',   onPlaylistUpdated)
+      mediaSocket.off('CONTROLLERS_UPDATED', onControllersUpdated)
       mediaSocket.off('HOST_DISCONNECTED',  onHostDisconnected)
       mediaSocket.disconnect()
     }
   }, [roomId, isHost, participantName, navigate])
 
-  // ── Host callbacks ─────────────────────────────────────────────────────────────
-  const handleFileSelect = async (file) => {
+  // ── Callbacks ─────────────────────────────────────────────────────────────
+  const handleFileSelect = async (files) => {
     try {
       setUploadProgress(0)
-      const uploadedMedia = await mediaSocket.uploadMedia(file, (progress) => {
+      const uploadedData = await mediaSocket.uploadMedia(files, (progress) => {
         setUploadProgress(progress)
       })
-      setMedia(uploadedMedia)
-      mediaSocket.sendMediaSelected(uploadedMedia.name)
+      const uploadedFiles = uploadedData.files || (uploadedData.name ? [{ name: uploadedData.name, url: uploadedData.url }] : [])
+      const names = uploadedFiles.map((f) => f.name)
+      
+      const shouldSelectFirst = !media && names.length > 0
+      mediaSocket.sendAddToPlaylist(names, shouldSelectFirst)
       setUploadProgress(null)
     } catch (error) {
       setUploadProgress(null)
       setConnStatus('error')
       console.error('Media upload failed:', error)
     }
+  }
+
+  const handleSelectPlaylistItem = (item) => {
+    if (!hasControl) return
+    const name = typeof item === 'string' ? item : item.name
+    mediaSocket.sendMediaSelected(name)
+  }
+
+  const handleRemovePlaylistItem = (item) => {
+    if (!hasControl) return
+    const name = typeof item === 'string' ? item : item.name
+    mediaSocket.sendRemoveFromPlaylist(name)
+  }
+
+  const handleToggleControl = (targetId) => {
+    if (!isHost) return
+    const isCurrentlyGranted = controllers.includes(targetId)
+    mediaSocket.sendToggleControl(targetId, !isCurrentlyGranted)
+  }
+
+  const handleNextTrack = () => {
+    if (!hasControl || playlist.length === 0) return
+    const currentIndex = playlist.findIndex((p) => p.name === media?.name)
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % playlist.length : 0
+    handleSelectPlaylistItem(playlist[nextIndex])
+  }
+
+  const handlePrevTrack = () => {
+    if (!hasControl || playlist.length === 0) return
+    const currentIndex = playlist.findIndex((p) => p.name === media?.name)
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : playlist.length - 1
+    handleSelectPlaylistItem(playlist[prevIndex])
   }
 
   const handlePlay  = (pos) => { setPlaying(true);  setSeekPosition(pos); mediaSocket.sendPlay(pos) }
@@ -145,26 +204,10 @@ function Room() {
     mediaSocket.sendChatMessage(message, clientMessageId)
   }
 
-  /**
-   * handleAddParticipant — wires to socketService.addParticipant.
-   * Real WS: ws.send({ type: 'ADD_PARTICIPANT', name })
-   */
-  const handleAddParticipant = (name) => {
+  const handleRemoveParticipant = () => {
     // Participant management is owned by the realtime server.
   }
 
-  /**
-   * handleRemoveParticipant — wires to socketService.removeParticipant.
-   * Real WS: ws.send({ type: 'REMOVE_PARTICIPANT', id })
-   */
-  const handleRemoveParticipant = (id) => {
-    // Participant management is owned by the realtime server.
-  }
-
-  /**
-   * handleLeaveRoom — used by both host header and PassengerPanel Leave button.
-   * Real WS: socketService.leaveRoom() sends LEAVE_ROOM before teardown.
-   */
   const handleLeaveRoom = () => {
     mediaSocket.leaveRoom()
     navigate('/')
@@ -182,7 +225,20 @@ function Room() {
       <header className="room-header">
         <span className="room-logo">▶ Play Together</span>
         <div className="room-header-right">
+          {/* Small camera / video meet toggle button right before connection status */}
+          <button
+            id="btn-toggle-meet"
+            className={`room-cam-btn ${showMeet ? 'active' : ''}`}
+            onClick={() => setShowMeet((prev) => !prev)}
+            title={showMeet ? 'Close Video Meet' : 'Open Video Meet'}
+            aria-label="Toggle Video Meet"
+          >
+            <span className="cam-icon">📹</span>
+            <span className="cam-label">Meet</span>
+          </button>
+
           <ConnectionStatus status={connStatus} />
+
           {/* Host Leave button — only visible in host header */}
           {isHost && (
             <button
@@ -214,19 +270,30 @@ function Room() {
               <div className="sidebar-divider" />
               <AdminControls
                 media={media}
+                playlist={playlist}
                 uploadProgress={uploadProgress}
                 participants={participants}
+                controllers={controllers}
                 onFileSelect={handleFileSelect}
+                onSelectPlaylistItem={handleSelectPlaylistItem}
+                onRemovePlaylistItem={handleRemovePlaylistItem}
+                onToggleControl={handleToggleControl}
                 onRemoveParticipant={handleRemoveParticipant}
-                onAddParticipant={handleAddParticipant}
               />
             </>
           )}
 
-          {/* Passenger Panel — Room ID + Leave only, no other controls */}
+          {/* Passenger Panel — Non-host participants (shows Co-Host controls if granted) */}
           {!isHost && (
             <PassengerPanel
               roomId={roomId}
+              hasControl={hasControl}
+              media={media}
+              playlist={playlist}
+              uploadProgress={uploadProgress}
+              onFileSelect={handleFileSelect}
+              onSelectPlaylistItem={handleSelectPlaylistItem}
+              onRemovePlaylistItem={handleRemovePlaylistItem}
               onLeaveRoom={handleLeaveRoom}
             />
           )}
@@ -240,13 +307,13 @@ function Room() {
           <div className="room-player-content">
           {!media ? (
             <div className="no-media">
-              <span className="no-media-icon">{isHost ? '📂' : '⏳'}</span>
+              <span className="no-media-icon">{hasControl ? '📂' : '⏳'}</span>
               <p className="no-media-title">
-                {isHost ? 'No file selected yet' : 'Waiting for host…'}
+                {hasControl ? 'No file selected yet' : 'Waiting for host…'}
               </p>
               <p className="no-media-sub">
-                {isHost
-                  ? 'Use the "Select File" button in the sidebar to choose a video or audio file.'
+                {hasControl
+                  ? 'Use the "Add Media Files" button in the sidebar to choose video or audio tracks.'
                   : 'The host hasn\'t selected a media file yet. Hang tight!'}
               </p>
             </div>
@@ -256,18 +323,37 @@ function Room() {
               src={media.url}
               mediaName={media.name}
               isHost={isHost}
+              hasControl={hasControl}
+              playlist={playlist}
               playing={playing}
               seekPosition={seekPosition}
               onPlay={handlePlay}
               onPause={handlePause}
               onSeek={handleSeek}
               onSync={handleSync}
+              onNextTrack={handleNextTrack}
+              onPrevTrack={handlePrevTrack}
             />
           )}
-            <MeetBox participantName={participantName} isHost={isHost} />
           </div>
         </main>
       </div>
+
+      {/* ── Floating Video Meet Overlay ── */}
+      {showMeet && (
+        <div
+          className="room-meet-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowMeet(false)
+          }}
+        >
+          <MeetBox
+            participantName={participantName}
+            isHost={isHost}
+            onClose={() => setShowMeet(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }

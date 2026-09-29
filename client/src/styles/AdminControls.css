@@ -13,6 +13,12 @@
   gap: 10px;
 }
 
+.ac-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .ac-section-label {
   display: flex;
   align-items: center;
@@ -60,33 +66,105 @@
   accent-color: var(--primary);
 }
 
-.ac-media-info {
+/* ── Playlist items ──────────────────────────────────────────── */
+.ac-playlist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ac-playlist-list::-webkit-scrollbar { width: 4px; }
+.ac-playlist-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.ac-playlist-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 6px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  animation: ac-fade-in 0.25s ease;
+  padding: 4px 6px 4px 8px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
 }
 
-@keyframes ac-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0);   }
+.ac-playlist-item:hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 90%, var(--primary) 10%);
 }
 
-.ac-media-icon { font-size: 1rem; flex-shrink: 0; }
+.ac-playlist-item.active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface-2));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent);
+}
 
-.ac-media-name {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+.ac-playlist-select-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.ac-playlist-icon {
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.ac-playlist-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
 }
 
-/* ── Participant list ─────────────────────────────────────────── */
+.ac-now-playing-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ac-item-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.ac-item-delete-btn:hover {
+  color: hsl(0 75% 65%);
+  background: hsl(0 70% 50% / 0.15);
+}
+
+/* ── Participant list & Co-Host Delegation ─────────────────────── */
 .ac-empty-hint {
   font-size: 0.82rem;
   color: var(--text-dim);
@@ -120,31 +198,81 @@
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 8px 10px;
   animation: ac-fade-in 0.2s ease;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.ac-participant-row:hover {
-  border-color: var(--primary-dim, var(--border));
+.ac-participant-row.is-cohost {
+  border-color: color-mix(in srgb, #f59e0b 60%, var(--border));
+  background: color-mix(in srgb, #f59e0b 10%, var(--surface-2));
+}
+
+.ac-participant-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .ac-participant-name {
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   font-weight: 500;
   color: var(--text);
-  flex: 1;
-  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.ac-cohost-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.04em;
+}
+
+.ac-participant-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ac-control-toggle-btn {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.ac-control-toggle-btn:hover {
+  background: color-mix(in srgb, var(--primary) 25%, transparent);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.ac-control-toggle-btn.active {
+  background: color-mix(in srgb, #f59e0b 25%, transparent);
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
+.ac-control-toggle-btn.active:hover {
+  background: color-mix(in srgb, hsl(0 75% 55%) 25%, transparent);
+  border-color: hsl(0 75% 55%);
+  color: hsl(0 75% 65%);
+}
+
 /* Kick / Remove button */
 .ac-kick-btn {
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -162,10 +290,6 @@
   background: hsl(0 70% 50% / 0.15);
   border-color: hsl(0 70% 55%);
   color: hsl(0 70% 60%);
-}
-
-.ac-kick-btn:active {
-  background: hsl(0 70% 50% / 0.3);
 }
 
 /* ── Add participant row ──────────────────────────────────────── */

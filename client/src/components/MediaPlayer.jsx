@@ -8,23 +8,39 @@ function getExt(name = '') {
 
 /**
  * MediaPlayer — reusable media player component.
- * Supports both <video> and <audio> files.
- * Contains NO WebSocket or socket logic.
+ * Supports both <video> and <audio> files, playlist navigation, and co-host control.
  *
  * Props:
  *   src          {string}   blob URL or HTTP URL of the media
  *   mediaName    {string}   filename (used to detect video vs audio)
- *   isHost       {boolean}  true → show controls; false → read-only
- *   playing      {boolean}  controlled play/pause state (from parent)
- *   seekPosition {number}   controlled seek position in seconds (from parent)
+ *   isHost       {boolean}  true → host view
+ *   hasControl   {boolean}  true → host or co-host (can scrub, play/pause, change tracks)
+ *   playlist     {Array}    queue of songs/videos
+ *   playing      {boolean}  controlled play/pause state
+ *   seekPosition {number}   controlled seek position in seconds
  *   onPlay       {(pos: number) => void}
  *   onPause      {(pos: number) => void}
  *   onSeek       {(pos: number) => void}
- *
- * Ref: exposes { getCurrentTime, getDuration } for parent use
+ *   onSync       {(pos: number, playing: boolean) => void}
+ *   onNextTrack  {() => void}
+ *   onPrevTrack  {() => void}
  */
 const MediaPlayer = forwardRef(function MediaPlayer(
-  { src, mediaName, isHost, playing, seekPosition, onPlay, onPause, onSeek, onSync },
+  {
+    src,
+    mediaName,
+    isHost,
+    hasControl,
+    playlist = [],
+    playing,
+    seekPosition,
+    onPlay,
+    onPause,
+    onSeek,
+    onSync,
+    onNextTrack,
+    onPrevTrack,
+  },
   ref
 ) {
   const mediaRef    = useRef(null)
@@ -38,6 +54,8 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const prevSeekRef     = useRef(seekPosition)
   const playerShellRef  = useRef(null)
 
+  const userCanControl = Boolean(isHost || hasControl)
+
   // Expose helpers to parent via ref
   useImperativeHandle(ref, () => ({
     getCurrentTime: () => mediaRef.current?.currentTime ?? 0,
@@ -49,7 +67,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     setIsVideo(VIDEO_EXTS.includes(getExt(mediaName)))
   }, [mediaName])
 
-  // Sync play/pause state from parent (participant view or after host emits)
+  // Sync play/pause state from parent
   useEffect(() => {
     if (prevPlayingRef.current === playing) return
     prevPlayingRef.current = playing
@@ -69,9 +87,9 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     setAutoplayBlocked(false)
   }, [src])
 
-  // Periodic sync emission for host
+  // Periodic sync emission for host/controllers
   useEffect(() => {
-    if (!isHost || !playing) return
+    if (!userCanControl || !playing) return
     const interval = setInterval(() => {
       const el = mediaRef.current
       if (el && !el.paused) {
@@ -79,14 +97,14 @@ const MediaPlayer = forwardRef(function MediaPlayer(
       }
     }, 800)
     return () => clearInterval(interval)
-  }, [isHost, playing, onSync])
+  }, [userCanControl, playing, onSync])
 
-  // Sync seek position and soft-drift correction from parent (participant view)
+  // Sync seek position and soft-drift correction for non-controllers
   useEffect(() => {
     if (prevSeekRef.current === seekPosition) return
     prevSeekRef.current = seekPosition
     const el = mediaRef.current
-    if (!el || isHost) return
+    if (!el || userCanControl) return
     
     // Enable pitch preservation for seamless micro-adjustments
     el.preservesPitch = true
@@ -115,7 +133,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
       }
       el.playbackRate = 1.0
     }
-  }, [seekPosition, playing, isHost])
+  }, [seekPosition, playing, userCanControl])
 
   // ── Event handlers ────────────────────────────────────────────────────────
   const handleTimeUpdate = () => {
@@ -128,22 +146,28 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     if (el) setDuration(el.duration)
   }
 
+  const handleMediaEnded = () => {
+    if (userCanControl && playlist.length > 1) {
+      onNextTrack?.()
+    }
+  }
+
   const handlePlayClick = () => {
     const el = mediaRef.current
-    if (!el || !isHost) return
+    if (!el || !userCanControl) return
     el.play().catch(() => {})
     onPlay?.(el.currentTime)
   }
 
   const handlePauseClick = () => {
     const el = mediaRef.current
-    if (!el || !isHost) return
+    if (!el || !userCanControl) return
     el.pause()
     onPause?.(el.currentTime)
   }
 
   const handleSeekChange = (e) => {
-    if (!isHost) return
+    if (!userCanControl) return
     const pos = parseFloat(e.target.value)
     const el  = mediaRef.current
     if (el) el.currentTime = pos
@@ -195,6 +219,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     src,
     onTimeUpdate:       handleTimeUpdate,
     onLoadedMetadata:   handleLoadedMetadata,
+    onEnded:            handleMediaEnded,
     className:          'mp-media-el',
     preload:            'metadata',
   }
@@ -240,7 +265,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
               background: `linear-gradient(to right, var(--primary) ${progressPct}%, var(--surface-2) ${progressPct}%)`
             }}
             onChange={handleSeekChange}
-            disabled={!isHost}
+            disabled={!userCanControl}
             aria-label="Seek"
           />
           <span className="mp-time">{fmt(duration)}</span>
@@ -258,9 +283,21 @@ const MediaPlayer = forwardRef(function MediaPlayer(
           </label>
         </div>
 
-        {/* Play / Pause button — host only */}
-        {isHost && !isFullscreen && (
+        {/* Playback action buttons for Host & Co-Hosts */}
+        {userCanControl && !isFullscreen ? (
           <div className="mp-btn-row">
+            {playlist.length > 1 && (
+              <button
+                type="button"
+                className="mp-skip-btn"
+                onClick={onPrevTrack}
+                title="Previous Track"
+                aria-label="Previous Track"
+              >
+                ⏮
+              </button>
+            )}
+
             {playing ? (
               <button id="btn-pause" className="mp-playpause" onClick={handlePauseClick}>
                 ⏸ Pause
@@ -270,19 +307,31 @@ const MediaPlayer = forwardRef(function MediaPlayer(
                 ▶ Play
               </button>
             )}
-          </div>
-        )}
 
-        {/* Participant read-only hint */}
-        {!isHost && (
-          <div className="mp-participant-hint">
-            👁 Participant view — playback is controlled by the host
-            {autoplayBlocked && (
-              <button className="btn btn-primary" onClick={handleParticipantStart}>
-                ▶ Start playback
+            {playlist.length > 1 && (
+              <button
+                type="button"
+                className="mp-skip-btn"
+                onClick={onNextTrack}
+                title="Next Track"
+                aria-label="Next Track"
+              >
+                ⏭
               </button>
             )}
           </div>
+        ) : (
+          /* Participant read-only hint */
+          !userCanControl && (
+            <div className="mp-participant-hint">
+              👁 Viewer view — playback is controlled by the room host & co-hosts
+              {autoplayBlocked && (
+                <button className="btn btn-primary mp-autoplay-btn" onClick={handleParticipantStart}>
+                  ▶ Start playback
+                </button>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>

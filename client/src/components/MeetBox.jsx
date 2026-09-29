@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import mediaSocket from '../services/mediaSocket'
 import '../styles/MeetBox.css'
 
@@ -6,7 +6,7 @@ const RTC_CONFIG = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 }
 
-function MeetBox({ participantName, isHost }) {
+function MeetBox({ participantName, isHost, onClose }) {
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
   const peersRef = useRef(new Map())
@@ -26,15 +26,26 @@ function MeetBox({ participantName, isHost }) {
     })
   }
 
-  const removePeer = (peerId) => {
+  const removePeer = useCallback((peerId) => {
     const peer = peersRef.current.get(peerId)
     peer?.close()
     peersRef.current.delete(peerId)
     pendingCandidatesRef.current.delete(peerId)
     setRemotePeers((current) => current.filter((peer) => peer.id !== peerId))
-  }
+  }, [])
 
-  const createPeer = (peerId, peerName, initiator) => {
+  const leaveMeet = useCallback(() => {
+    peersRef.current.forEach((peer) => peer.close())
+    peersRef.current.clear()
+    pendingCandidatesRef.current.clear()
+    localStreamRef.current?.getTracks().forEach((track) => track.stop())
+    localStreamRef.current = null
+    if (localVideoRef.current) localVideoRef.current.srcObject = null
+    setRemotePeers([])
+    setJoined(false)
+  }, [])
+
+  const createPeer = useCallback((peerId, peerName, initiator) => {
     const existing = peersRef.current.get(peerId)
     if (existing) return existing
 
@@ -57,7 +68,7 @@ function MeetBox({ participantName, isHost }) {
         .catch(() => setError('Could not connect to a participant.'))
     }
     return peer
-  }
+  }, [removePeer])
 
   useEffect(() => {
     if (joined && localVideoRef.current && localStreamRef.current) {
@@ -114,7 +125,7 @@ function MeetBox({ participantName, isHost }) {
       mediaSocket.off('MEET_SIGNAL', onSignal)
       mediaSocket.off('MEET_ENDED', onMeetEnded)
     }
-  }, [joined])
+  }, [joined, createPeer, removePeer, leaveMeet])
 
   const joinMeet = async () => {
     setError('')
@@ -129,17 +140,6 @@ function MeetBox({ participantName, isHost }) {
     } catch {
       setError('Camera and microphone permission is required to join.')
     }
-  }
-
-  const leaveMeet = () => {
-    peersRef.current.forEach((peer) => peer.close())
-    peersRef.current.clear()
-    pendingCandidatesRef.current.clear()
-    localStreamRef.current?.getTracks().forEach((track) => track.stop())
-    localStreamRef.current = null
-    if (localVideoRef.current) localVideoRef.current.srcObject = null
-    setRemotePeers([])
-    setJoined(false)
   }
 
   const endMeet = () => {
@@ -187,21 +187,34 @@ function MeetBox({ participantName, isHost }) {
     }
   }
 
-  useEffect(() => () => leaveMeet(), [])
+  useEffect(() => () => leaveMeet(), [leaveMeet])
 
   return (
     <section className="meet-box" aria-label="Room meet">
       <div className="meet-header">
-        <div>
-          <h2><span className="meet-header-icon">▣</span> Room meet</h2>
-          <span>{joined ? `${remotePeers.length + 1} connected` : 'Audio and video'}</span>
+        <div className="meet-header-title">
+          <h2><span className="meet-header-icon">📹</span> Video Meet</h2>
+          <span>{joined ? `${remotePeers.length + 1} connected` : 'Camera & Microphone'}</span>
         </div>
-        <span className={`meet-status-dot${joined ? ' active' : ''}`} />
+        <div className="meet-header-actions">
+          <span className={`meet-status-dot${joined ? ' active' : ''}`} />
+          {onClose && (
+            <button
+              type="button"
+              className="meet-close-btn"
+              onClick={onClose}
+              title="Close Meet panel"
+              aria-label="Close Meet"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {!joined ? (
         <div className="meet-start">
-          <p>Join the room call with your camera and microphone.</p>
+          <p>Join the room video call with your camera and microphone.</p>
           <button type="button" onClick={joinMeet}>Join meet</button>
           {error && <small>{error}</small>}
         </div>
@@ -216,10 +229,10 @@ function MeetBox({ participantName, isHost }) {
           </div>
           <div className="meet-controls">
             <button type="button" className={`meet-icon-button${micOn ? '' : ' is-off'}`} onClick={() => toggleTrack('audio')} aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'} title={micOn ? 'Mute microphone' : 'Unmute microphone'}>
-              <span aria-hidden="true">{micOn ? '♩' : '×'}</span>
+              <span aria-hidden="true">{micOn ? '🎙' : '🔇'}</span>
             </button>
             <button type="button" className={`meet-icon-button${cameraOn ? '' : ' is-off'}`} onClick={() => toggleTrack('video')} aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
-              <span aria-hidden="true">{cameraOn ? '▣' : '×'}</span>
+              <span aria-hidden="true">{cameraOn ? '📹' : '🚫'}</span>
             </button>
             <button type="button" className="meet-icon-button" onClick={switchCamera} aria-label="Switch front and back camera" title="Switch front and back camera">
               <span aria-hidden="true">↻</span>

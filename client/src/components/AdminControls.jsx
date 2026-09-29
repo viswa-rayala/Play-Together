@@ -1,52 +1,58 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import '../styles/AdminControls.css'
 
 /**
  * AdminControls — full Admin Panel for the host sidebar.
- * Pure UI — no socket/network logic inside.
+ * Includes multi-file uploading, playlist switching, and co-host control delegation.
  *
  * Props:
  *   media               {object | null}          { name, url }
- *   participants        {Array<{id,name}>}        live participant list
- *   onFileSelect        {(File)    => void}
- *   onRemoveParticipant {(id)      => void}       kick a participant
- *   onAddParticipant    {(name)    => void}       add a participant by name
+ *   playlist            {Array<{name, url}>}     playlist items
+ *   uploadProgress      {number | null}
+ *   participants        {Array<{id,name}>}       live participant list
+ *   controllers         {Array<string>}          socket IDs granted control
+ *   onFileSelect        {(FileList|File[]) => void}
+ *   onSelectPlaylistItem{(item) => void}
+ *   onRemovePlaylistItem{(name) => void}
+ *   onToggleControl     {(targetId) => void}
+ *   onRemoveParticipant {(id) => void}
  */
 function AdminControls({
   media,
+  playlist = [],
   uploadProgress,
-  participants,
+  participants = [],
+  controllers = [],
   onFileSelect,
+  onSelectPlaylistItem,
+  onRemovePlaylistItem,
+  onToggleControl,
   onRemoveParticipant,
-  onAddParticipant,
 }) {
   const fileInputRef  = useRef(null)
-  const [newName, setNewName] = useState('')
-
-  const handleAdd = () => {
-    const trimmed = newName.trim()
-    if (!trimmed) return
-    onAddParticipant?.(trimmed)
-    setNewName('')
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') handleAdd()
-  }
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0]
-    if (file) onFileSelect(file)
-    // Reset so the same file can be re-picked if needed
+    const files = e.target.files
+    if (files && files.length > 0) {
+      onFileSelect(files)
+    }
+    // Reset so the same files can be re-picked if needed
     e.target.value = ''
   }
+
+  const isAudioFile = (name = '') => /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(name)
 
   return (
     <div className="admin-controls">
 
-      {/* ── Section: Media File ── */}
+      {/* ── Section: Media Upload & Playlist ── */}
       <section className="ac-section">
-        <p className="ac-section-label">📂 Media File</p>
+        <div className="ac-section-header">
+          <p className="ac-section-label">
+            📂 Media & Playlist
+            <span className="ac-count-badge">{playlist.length}</span>
+          </p>
+        </div>
 
         <button
           id="btn-select-media"
@@ -56,7 +62,7 @@ function AdminControls({
         >
           {uploadProgress !== null
             ? `Uploading ${Math.round(uploadProgress * 100)}%`
-            : media ? '📂 Change File' : '📂 Select File'}
+            : '+ Add Songs / Videos'}
         </button>
 
         {uploadProgress !== null && (
@@ -68,32 +74,67 @@ function AdminControls({
           />
         )}
 
-        {/* Hidden native file input */}
+        {/* Hidden native multiple file input */}
         <input
           ref={fileInputRef}
           type="file"
           accept="video/*,audio/*"
+          multiple
           style={{ display: 'none' }}
           onChange={handleFileChange}
           aria-hidden="true"
         />
 
-        {media && (
-          <div className="ac-media-info" title={media.name}>
-            <span className="ac-media-icon">
-              {media.name.match(/\.(mp3|wav|ogg|aac|flac|m4a)$/i) ? '🎵' : '🎬'}
-            </span>
-            <span className="ac-media-name">{media.name}</span>
-          </div>
+        {/* Playlist Queue */}
+        {playlist.length === 0 ? (
+          <p className="ac-empty-hint">No media in playlist. Upload files above.</p>
+        ) : (
+          <ul className="ac-playlist-list" aria-label="Media Playlist">
+            {playlist.map((item, index) => {
+              const isActive = media?.name === item.name
+              return (
+                <li
+                  key={`${item.name}-${index}`}
+                  className={`ac-playlist-item ${isActive ? 'active' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="ac-playlist-select-btn"
+                    onClick={() => onSelectPlaylistItem?.(item)}
+                    title={`Play ${item.name}`}
+                  >
+                    <span className="ac-playlist-icon">
+                      {isAudioFile(item.name) ? '🎵' : '🎬'}
+                    </span>
+                    <span className="ac-playlist-name">{item.name}</span>
+                    {isActive && <span className="ac-now-playing-tag">▶ Playing</span>}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ac-item-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemovePlaylistItem?.(item.name)
+                    }}
+                    title={`Remove ${item.name} from playlist`}
+                    aria-label={`Remove ${item.name}`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
         )}
       </section>
 
       <div className="ac-divider" />
 
-      {/* ── Section: Participants ── */}
+      {/* ── Section: Participants & Permission Delegation ── */}
       <section className="ac-section">
         <p className="ac-section-label">
-          👥 Participants
+          👥 Participants & Co-Hosts
           <span className="ac-count-badge">{participants.length}</span>
         </p>
 
@@ -101,52 +142,42 @@ function AdminControls({
           <p className="ac-empty-hint">No one has joined yet.</p>
         ) : (
           <ul className="ac-participant-list">
-            {participants.map((p) => (
-              <li key={p.id} className="ac-participant-row">
-                <span className="ac-participant-name" title={p.id}>
-                  {p.name}
-                </span>
-                <button
-                  className="ac-kick-btn"
-                  onClick={() => onRemoveParticipant(p.id)}
-                  aria-label={`Remove ${p.name}`}
-                  title={`Kick ${p.name}`}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
+            {participants.map((p) => {
+              const isCoHost = controllers.includes(p.id)
+              return (
+                <li key={p.id} className={`ac-participant-row ${isCoHost ? 'is-cohost' : ''}`}>
+                  <div className="ac-participant-info">
+                    <span className="ac-participant-name" title={p.id}>
+                      {p.name}
+                    </span>
+                    {isCoHost && <span className="ac-cohost-badge">🎮 Co-Host</span>}
+                  </div>
+
+                  <div className="ac-participant-actions">
+                    <button
+                      type="button"
+                      className={`ac-control-toggle-btn ${isCoHost ? 'active' : ''}`}
+                      onClick={() => onToggleControl?.(p.id)}
+                      title={isCoHost ? `Revoke playback control from ${p.name}` : `Give playback control to ${p.name}`}
+                    >
+                      {isCoHost ? 'Revoke Control' : 'Give Control'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="ac-kick-btn"
+                      onClick={() => onRemoveParticipant?.(p.id)}
+                      aria-label={`Remove ${p.name}`}
+                      title={`Kick ${p.name}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
-      </section>
-
-      <div className="ac-divider" />
-
-      {/* ── Section: Add Participant ── */}
-      <section className="ac-section">
-        <p className="ac-section-label">➕ Add Participant</p>
-        <div className="ac-add-row">
-          <input
-            id="input-add-participant"
-            type="text"
-            className="ac-add-input"
-            placeholder="Enter name…"
-            value={newName}
-            maxLength={32}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={handleKeyDown}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button
-            id="btn-add-participant"
-            className="btn btn-primary ac-add-btn"
-            onClick={handleAdd}
-            disabled={!newName.trim()}
-          >
-            Add
-          </button>
-        </div>
       </section>
 
     </div>
