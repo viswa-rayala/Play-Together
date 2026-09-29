@@ -13,6 +13,7 @@ Browser (React + Vite)
    +-- Socket.IO + HTTP --> Media Server (src/mediaServer.cjs)
                                |  File upload and byte-range streaming
                                |  Room playback state management
+                               |  NTP clock calibration & scheduled future playback
                                |  Real-time chat (latest 100 messages)
                                |  Playlist management
                                |  WebRTC Meet signaling
@@ -48,17 +49,25 @@ Browser (React + Vite)
 - **Free-Tier Server Spin-Up (10–20s):** On free hosting providers such as Render, web services automatically go to sleep after 15 minutes of inactivity. When creating a room after an idle period, the initial request may take approximately 10 to 20 seconds while the server wakes up.
 
 
-### Synchronized Playback
+### Synchronized Playback (Beatsync-Inspired Low-Drift Engine)
 
-- Hosts (and co-hosts) upload **video** (`.mp4`, `.webm`, `.ogg`) or **audio** (`.mp3`, `.wav`, `.ogg`) files.
-- Files are streamed from the media server using **HTTP byte-range requests** for reliable seeking.
-- Play, pause, and seek events are broadcast to all room members via Socket.IO.
-- **NTP-style clock synchronisation** (`TIME_REQUEST` / `TIME_RESPONSE`) compensates for network latency so all clients share a common reference time.
-- **Soft drift correction** (`SYNC` events emitted every 800 ms by the controller):
-  - Drift **> 1.2 s** -- hard seek.
-  - Drift **<= 40 ms** -- no action (dead-band, prevents speed oscillation).
-  - Otherwise -- proportional `playbackRate` adjustment (+/-5%) for imperceptible catch-up/slow-down.
-  - `preservesPitch` is set to avoid audio artefacts during speed adjustment.
+Play Together incorporates advanced multi-device synchronization techniques inspired by [Beatsync.gg](https://beatsync.gg) to keep video and audio in lockstep across phones, laptops, and tablets:
+
+- **Future-Scheduled Playback (`scheduledAt` Lead Window):**
+  - Standard web players suffer from start latency: when the host clicks Play, the host starts instantly while viewers lag by 150–250ms due to network transit and decoder warmup.
+  - Play Together solves this by scheduling playback **200 ms into the future** (`scheduledAt = serverTime + 200ms` for play, `150ms` for seek).
+  - During this lead window, both host and viewer browsers pre-cue `el.currentTime = position` to prime their hardware media decoders.
+  - A high-precision countdown timer fires `el.play()` on all devices at the **exact same physical millisecond**, achieving true simultaneous start.
+- **Multi-Sample NTP Burst Calibration with Outlier Rejection:**
+  - Upon connecting, clients execute a burst of **8 rapid pings** (spaced 35ms apart) over WebSockets (`TIME_REQUEST` / `TIME_RESPONSE`).
+  - Network jitter, Wi-Fi spikes, and mobile queuing delays are filtered out by sorting samples by lowest Round-Trip Time (RTT) and selecting the top 50% lowest-latency samples.
+  - Background calibration runs a 4-ping check every 8 seconds, utilizing an **Exponential Moving Average (EMA)** (`offset = 0.65 * previous + 0.35 * new`) to smoothly adapt to crystal clock skew without sudden playback jumps.
+- **Tight Phase-Locked Loop (PLL) Soft Drift Correction:**
+  - Controllers broadcast live position via `SYNC` events every 800 ms.
+  - **Drift <= 30 ms:** Dead-band (considered in perfect lockstep; prevents speed jitter and flutter).
+  - **30 ms < Drift <= 1.2 s:** Proportional playback rate adjustment (`0.96x – 1.04x`) with `preservesPitch = true`. The player imperceptibly speeds up or slows down to pull back into phase without audible pitch shifting, skips, or clicks.
+  - **Drift > 1.2 s:** Hard seek (realigns viewer if network stalls or mobile screen was locked).
+- **HTTP Byte-Range Streaming:** Uploaded files stream via HTTP 206 partial-content requests, enabling instantaneous scrubbing and random seeks on large media files.
 
 ### Playlist Queue
 
@@ -89,15 +98,19 @@ Browser (React + Vite)
 - A TURN server may be needed for participants behind restrictive NATs/firewalls.
 - The host can end the Meet for all participants.
 
-### Media Player UI
+### Media Player UI & Mobile Experience
 
 - **Adaptive Video Stage vs. Audio Dock:**
-  - When playing **video** files (`.mp4`, `.webm`), the media automatically renders in an expanded stage format front-and-centre for an optimal watch-party experience.
-  - When playing **audio** files (`.mp3`, `.wav`), an ambient visualizer card renders on stage while the player docks cleanly at the bottom dock.
-- **Mobile-Responsive Dock:** Optimized for small screens (`<=640px`) with edge-to-edge layout, responsive touch controls, and accessible seek bar.
-- **Accent colour picker:** Each user can personalise the player highlight colour locally.
-- Previous / Next track skip buttons appear when the playlist has more than one item.
-- Autoplay-blocked browsers show a manual "Start playback" prompt for participants.
+  - **Video (`.mp4`, `.webm`, `.mov`):** Renders in an expanded cinematic stage format front-and-centre for an optimal watch-party experience.
+  - **Audio (`.mp3`, `.wav`, `.aac`):** Displays a central glowing visualizer ambient card while dock controls remain cleanly anchored at the bottom.
+- **Full Song Title Visibility (No Mobile Truncation):**
+  - **Stage Ambient Card:** Multiline title wrapping ensures even exceptionally long filenames wrap cleanly across lines in the middle of the screen.
+  - **Two-Tier Mobile Player Dock (`<=768px`):** Top row allocates 100% full width to track art, live status badge, and track name (2-line wrap); bottom row houses edge-to-edge playback buttons, progress slider, and duration timers.
+  - **Tap-to-Expand Title (`.show-full`):** Tapping the song title toggles full filename expansion without clipping.
+  - **Expanded Desktop Dock:** Increased track title width capacity (up to 380px).
+- **Accent Colour Picker:** Each user can personalise the player highlight colour locally.
+- **Previous / Next Track Buttons:** Seamless playlist skipping for hosts and co-hosts.
+- **Autoplay Permission Helper:** Browsers blocking unmuted autoplay display a one-tap "Start Playback" prompt so mobile users can sync instantly.
 
 ---
 
