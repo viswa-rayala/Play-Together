@@ -33,12 +33,18 @@ Browser (React + Vite)
 
 ## Features
 
-### Room Management
+### Room Management & Roles
 
+- **Single Host Authority:** The server strictly enforces one **👑 Host** per room. Even if participants join via a link containing `?host=true`, the server assigns only the initial creator as Host and designates all subsequent joiners as Viewers, preventing playback conflicts.
+- **Graceful Host Succession:** If the active host leaves or disconnects while other participants remain in the room, the server automatically promotes the next participant (or active co-host) to **Host**, ensuring the room and playback never stall.
+- **Removing / Kicking Participants:** The host can remove any participant from the room at any time using the **✕** button in the Participants list (with confirmation). The removed participant receives an immediate notification and is safely redirected.
+- **Three-Tier Role Visibility:** Clear badges are displayed across both host and passenger panels:
+  - **👑 Host**: Room owner with full control (upload files, switch tracks, manage playlist, grant/revoke co-host control, kick users).
+  - **🎮 Co-Host**: Participants delegated playback control by the host (can play, pause, seek, and select tracks).
+  - **👤 Viewer**: Synchronized listeners/viewers with a read-only seek bar and live room visibility.
 - **Host** creates a room with a custom or auto-generated 6-character alphanumeric ID.
 - **Participants** join by entering the shared room ID and a display name.
 - Room IDs are validated for format (A-Z, 0-9, 4-10 characters).
-- If the host disconnects, all participants are redirected to the home page.
 
 ### Synchronized Playback
 
@@ -60,9 +66,9 @@ Browser (React + Vite)
 
 ### Co-Host Control Delegation
 
-- The host can grant or revoke **playback control** to any participant at any time via the Participants panel.
+- The host can grant or revoke **playback control** to any participant at any time via the Participants panel ("Give Control" / "Revoke Control").
 - Co-hosts can play, pause, seek, switch tracks, upload files, and manage the playlist.
-- Participants without control see a read-only viewer view.
+- Participants without control see a read-only viewer view synchronized with the room controller.
 
 ### Real-Time Chat
 
@@ -83,8 +89,11 @@ Browser (React + Vite)
 
 ### Media Player UI
 
-- Docked **bottom-tab** player that can be expanded to a larger view or toggled to fullscreen.
-- **Accent colour picker** -- each user can personalise the player highlight colour locally.
+- **Adaptive Video Stage vs. Audio Dock:**
+  - When playing **video** files (`.mp4`, `.webm`), the media automatically renders in an expanded stage format front-and-centre for an optimal watch-party experience.
+  - When playing **audio** files (`.mp3`, `.wav`), an ambient visualizer card renders on stage while the player docks cleanly at the bottom dock.
+- **Mobile-Responsive Dock:** Optimized for small screens (`<=640px`) with edge-to-edge layout, responsive touch controls, and accessible seek bar.
+- **Accent colour picker:** Each user can personalise the player highlight colour locally.
 - Previous / Next track skip buttons appear when the playlist has more than one item.
 - Autoplay-blocked browsers show a manual "Start playback" prompt for participants.
 
@@ -293,4 +302,5 @@ Before pushing, verify `server/.env` is not listed by `git status`. If a service
 ---
 
 > **Note on "No Internet Required" (LAN Compatibility)**  
-> Play Together is designed so that it can run entirely on a Local Area Network (LAN). If you host the API and Media server locally (`npm run dev`), devices on the same WiFi network can connect using your local IP address. Media streaming and WebRTC video calls will route directly over your local router at maximum local speeds, without consuming any internet bandwidth.
+> Play Together is designed so that it can run entirely on a Local Area Network (LAN). If you host the API and Media server locally (`npm run dev`), devices on the same WiFi network can connect using your local IP address. Media streaming and WebRTC video calls route directly over your local router at maximum local speeds, without consuming any internet bandwidth.  
+> *Tip for Mobile Meet Testing:* Mobile browsers require a secure context for camera/mic access. To test video Meet over local HTTP without internet, enable `unsafely-treat-insecure-origin-as-secure` under `chrome://flags` or `brave://flags` and enter your PC's local network URL (e.g. `http://192.168.x.x:5173`).
