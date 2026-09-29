@@ -22,6 +22,10 @@ function PassengerPanel({
   media,
   playlist = [],
   uploadProgress,
+  participants = [],
+  hostId,
+  myId,
+  controllers = [],
   onFileSelect,
   onSelectPlaylistItem,
   onRemovePlaylistItem,
@@ -134,6 +138,46 @@ function PassengerPanel({
                     >
                       ✕
                     </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* In Room Participants list */}
+      <div className="pp-section">
+        <div className="pp-playlist-header">
+          <p className="pp-label">
+            👥 In Room
+            <span className="pp-count-badge">{participants.length}</span>
+          </p>
+        </div>
+        {participants.length === 0 ? (
+          <p className="pp-empty-hint">Connecting to room...</p>
+        ) : (
+          <ul className="pp-participant-list" aria-label="Room Participants">
+            {participants.map((p) => {
+              const currentHostId = hostId || participants.find((item) => item.isHost)?.id
+              const isThisHost = Boolean(currentHostId ? p.id === currentHostId : p.isHost)
+              const isCoHost = !isThisHost && Array.isArray(controllers) && controllers.includes(p.id)
+              const isMe = Boolean(myId && p.id === myId)
+
+              return (
+                <li
+                  key={p.id}
+                  className={`pp-participant-item ${isThisHost ? 'is-host' : isCoHost ? 'is-cohost' : ''}`}
+                >
+                  <span className="pp-participant-name" title={p.id}>
+                    {p.name} {isMe ? '(You)' : ''}
+                  </span>
+                  {isThisHost ? (
+                    <span className="pp-badge-host">👑 Host</span>
+                  ) : isCoHost ? (
+                    <span className="pp-badge-cohost">🎮 Co-Host</span>
+                  ) : (
+                    <span className="pp-badge-viewer">👤 Viewer</span>
                   )}
                 </li>
               )

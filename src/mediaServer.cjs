@@ -254,12 +254,20 @@ io.on("connection", socket => {
     const roomId = String(socket.handshake.auth?.roomId || "default");
     const roomState = getRoomState(roomId);
     const participantName = String(socket.handshake.auth?.name || "Participant").trim() || "Participant";
-    let hostId = hostIds.get(roomId) || null;
+    let currentHostId = hostIds.get(roomId) || null;
 
-    if (!hostId && socket.handshake.auth?.isHost === true) {
-        hostId = socket.id;
-        hostIds.set(roomId, hostId);
-        console.log("Host assigned:", hostId);
+    // Check if the registered host is still actively connected in socket.io
+    if (currentHostId && !io.sockets.sockets.has(currentHostId)) {
+        currentHostId = null;
+        hostIds.delete(roomId);
+    }
+
+    if (!currentHostId) {
+        currentHostId = socket.id;
+        hostIds.set(roomId, currentHostId);
+        console.log("Host assigned:", currentHostId, "Room:", roomId, "Name:", participantName);
+    } else if (socket.handshake.auth?.isHost === true && currentHostId !== socket.id) {
+        console.log(`Client ${socket.id} (${participantName}) joined with isHost=true, but room ${roomId} already has host ${currentHostId}. Denying host privileges.`);
     }
 
     socket.join(roomId);
@@ -270,11 +278,11 @@ io.on("connection", socket => {
     );
 
     const getParticipantsWithRole = () => {
-        const currentHost = hostIds.get(roomId);
+        const activeHost = hostIds.get(roomId);
         return roomState.participants.map(p => ({
             id: p.id,
             name: p.name,
-            isHost: p.id === currentHost
+            isHost: p.id === activeHost
         }));
     };
 
@@ -291,9 +299,9 @@ io.on("connection", socket => {
             serverTime:
                 Date.now(),
             isHost:
-                socket.id === hostId,
+                socket.id === currentHostId,
             hostId:
-                hostId,
+                currentHostId,
             hasControl:
                 canControl(roomId, socket.id),
             myId:
@@ -305,7 +313,7 @@ io.on("connection", socket => {
 
     io.to(roomId).emit("PARTICIPANT_JOINED", {
         participants: getParticipantsWithRole(),
-        hostId: hostId
+        hostId: currentHostId
     });
 
     socket.emit("MEET_PEERS", {
@@ -323,7 +331,7 @@ io.on("connection", socket => {
         "ROLE",
         {
             isHost:
-                socket.id === hostId
+                socket.id === currentHostId
         }
     );
 
@@ -380,7 +388,7 @@ io.on("connection", socket => {
     });
 
     socket.on("MEET_END", () => {
-        if (socket.id === hostId) {
+        if (socket.id === hostIds.get(roomId)) {
             io.to(roomId).emit("MEET_ENDED");
         }
     });
@@ -406,6 +414,39 @@ io.on("connection", socket => {
         }
 
         console.log(`Controllers updated in room ${roomId}:`, roomState.controllers);
+        io.to(roomId).emit("CONTROLLERS_UPDATED", {
+            controllers: roomState.controllers
+        });
+    });
+
+    // Host removes / kicks a participant from the room
+    socket.on("REMOVE_PARTICIPANT", data => {
+        const currentHost = hostIds.get(roomId);
+        if (socket.id !== currentHost) {
+            socket.emit("CONTROL_DENIED", { message: "Only the Host can remove participants." });
+            return;
+        }
+        const targetId = String(data?.targetId || "").trim();
+        if (!targetId || targetId === currentHost) return;
+
+        console.log(`Host ${socket.id} removing participant ${targetId} from room ${roomId}`);
+
+        const targetSocket = io.sockets.sockets.get(targetId);
+        if (targetSocket) {
+            targetSocket.emit("KICKED", {
+                reason: "You were removed from the room by the Host."
+            });
+            targetSocket.leave(roomId);
+        }
+
+        removeParticipant(roomState, targetId);
+        const updatedParticipants = getParticipantsWithRole();
+        io.to(roomId).emit("PARTICIPANT_LEFT", {
+            participants: updatedParticipants,
+            hostId: currentHost,
+            removedId: targetId
+        });
+        io.to(roomId).emit("MEET_PEER_LEFT", { id: targetId });
         io.to(roomId).emit("CONTROLLERS_UPDATED", {
             controllers: roomState.controllers
         });
@@ -664,22 +705,36 @@ io.on("connection", socket => {
     );
 
     socket.on("LEAVE_ROOM", () => {
-        const isHostLeaving = socket.id === hostId;
+        const currentHost = hostIds.get(roomId);
+        const isHostLeaving = socket.id === currentHost;
+
+        removeParticipant(roomState, socket.id);
 
         if (isHostLeaving) {
             console.log("Host left room:", roomId);
-            endRoom(roomId, roomState);
-            io.to(roomId).emit("HOST_DISCONNECTED");
+            if (roomState.participants.length > 0) {
+                // Promote next participant (prefer controller if available)
+                const nextHost = roomState.participants.find(p => (roomState.controllers || []).includes(p.id)) || roomState.participants[0];
+                hostIds.set(roomId, nextHost.id);
+                console.log(`Promoted ${nextHost.name} (${nextHost.id}) to Host on leave.`);
+                const updatedParticipants = getParticipantsWithRole();
+                io.to(roomId).emit("HOST_CHANGED", {
+                    hostId: nextHost.id,
+                    hostName: nextHost.name,
+                    participants: updatedParticipants
+                });
+                const nextHostSocket = io.sockets.sockets.get(nextHost.id);
+                if (nextHostSocket) {
+                    nextHostSocket.emit("ROLE", { isHost: true });
+                }
+            } else {
+                endRoom(roomId, roomState);
+                io.to(roomId).emit("HOST_DISCONNECTED");
+            }
             return;
         }
 
-        removeParticipant(roomState, socket.id);
-        const currentHost = hostIds.get(roomId);
-        const participantsWithRole = roomState.participants.map(p => ({
-            id: p.id,
-            name: p.name,
-            isHost: p.id === currentHost
-        }));
+        const participantsWithRole = getParticipantsWithRole();
         socket.to(roomId).emit("PARTICIPANT_LEFT", {
             participants: participantsWithRole,
             hostId: currentHost
@@ -692,40 +747,52 @@ io.on("connection", socket => {
     socket.on(
         "disconnect",
         () => {
-
             console.log(
                 "Client disconnected:",
                 socket.id
             );
 
             removeParticipant(roomState, socket.id);
-            const remainingHost = hostIds.get(roomId);
-            const remainingParticipants = roomState.participants.map(p => ({
-                id: p.id,
-                name: p.name,
-                isHost: p.id === remainingHost
-            }));
+            const currentHost = hostIds.get(roomId);
 
-            socket.to(roomId).emit("PARTICIPANT_LEFT", {
-                participants: remainingParticipants,
-                hostId: remainingHost
-            });
+            if (socket.id === currentHost) {
+                console.log(
+                    "Host disconnected from room:", roomId
+                );
+
+                if (roomState.participants.length > 0) {
+                    // Gracefully promote next participant so playback and room persist
+                    const nextHost = roomState.participants.find(p => (roomState.controllers || []).includes(p.id)) || roomState.participants[0];
+                    hostIds.set(roomId, nextHost.id);
+                    console.log(`Promoted ${nextHost.name} (${nextHost.id}) to Host on disconnect.`);
+                    const updatedParticipants = getParticipantsWithRole();
+                    io.to(roomId).emit("HOST_CHANGED", {
+                        hostId: nextHost.id,
+                        hostName: nextHost.name,
+                        participants: updatedParticipants
+                    });
+                    const nextHostSocket = io.sockets.sockets.get(nextHost.id);
+                    if (nextHostSocket) {
+                        nextHostSocket.emit("ROLE", { isHost: true });
+                    }
+                } else {
+                    endRoom(roomId, roomState);
+                    io.to(roomId).emit(
+                        "HOST_DISCONNECTED"
+                    );
+                }
+            } else {
+                const remainingParticipants = getParticipantsWithRole();
+                socket.to(roomId).emit("PARTICIPANT_LEFT", {
+                    participants: remainingParticipants,
+                    hostId: currentHost
+                });
+            }
+
             socket.to(roomId).emit("MEET_PEER_LEFT", { id: socket.id });
             io.to(roomId).emit("CONTROLLERS_UPDATED", {
                 controllers: roomState.controllers
             });
-
-            if (socket.id === hostId) {
-
-                console.log(
-                    "Host disconnected"
-                );
-
-                endRoom(roomId, roomState);
-                io.to(roomId).emit(
-                    "HOST_DISCONNECTED"
-                );
-            }
         }
     );
 });

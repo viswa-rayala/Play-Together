@@ -27,12 +27,12 @@ function Room() {
   const { roomId }       = useParams()
   const [searchParams]   = useSearchParams()
   const navigate         = useNavigate()
-  const isHost           = searchParams.get('host') === 'true'
+  const [isHost, setIsHost] = useState(searchParams.get('host') === 'true')
   const participantName  = searchParams.get('name') || 'Participant'
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [connStatus,    setConnStatus]   = useState('connecting')
-  const [participants,  setParticipants] = useState([])  // [{id, name}]
+  const [participants,  setParticipants] = useState([])  // [{id, name, isHost}]
   const [media,         setMedia]        = useState(null)   // { name, url }
   const [playlist,      setPlaylist]     = useState([])     // [{ name, url }]
   const [controllers,   setControllers]  = useState([])     // [socketId]
@@ -51,6 +51,8 @@ function Room() {
 
   // ── Socket setup ──────────────────────────────────────────────────────────
   useEffect(() => {
+    const initialIsHost = searchParams.get('host') === 'true'
+
     // Named handlers so we can remove them on cleanup
     const onConnStatus      = ({ status }) => setConnStatus(status)
     const onRoomState       = (s) => {
@@ -61,6 +63,17 @@ function Room() {
       setControllers(s.controllers || [])
       if (s.myId) setMyId(s.myId)
       if (s.hostId) setHostId(s.hostId)
+
+      // Server is the single source of truth for Host role
+      if (typeof s.isHost === 'boolean') {
+        setIsHost(s.isHost)
+        if (!s.isHost && searchParams.get('host') === 'true') {
+          const nextParams = new URLSearchParams(searchParams)
+          nextParams.set('host', 'false')
+          window.history.replaceState(null, '', `${window.location.pathname}?${nextParams.toString()}`)
+        }
+      }
+
       setPlaying(s.playback.playing)
       if (s.playback.playing && s.serverTime) {
         const elapsed = Math.max(0, (mediaSocket.getServerTime() - s.serverTime) / 1000)
@@ -117,42 +130,76 @@ function Room() {
       mediaSocket.disconnect()
       navigate('/')
     }
+    const onRole = ({ isHost: newIsHost }) => {
+      if (typeof newIsHost === 'boolean') {
+        setIsHost(newIsHost)
+        if (!newIsHost && searchParams.get('host') === 'true') {
+          const nextParams = new URLSearchParams(searchParams)
+          nextParams.set('host', 'false')
+          window.history.replaceState(null, '', `${window.location.pathname}?${nextParams.toString()}`)
+        }
+      }
+    }
+    const onHostChanged = (data) => {
+      if (data?.hostId) setHostId(data.hostId)
+      if (data?.participants) setParticipants(data.participants)
+      if (data?.hostId) {
+        const amIHost = data.hostId === mediaSocket.getMyId()
+        setIsHost(amIHost)
+      }
+    }
+    const onKicked = (data) => {
+      alert(data?.reason || 'You have been removed from the room by the host.')
+      mediaSocket.leaveRoom()
+      navigate('/')
+    }
+    const onControlDenied = (data) => {
+      console.warn('Playback control denied:', data?.message)
+    }
 
-    mediaSocket.on('CONNECTION_STATUS',  onConnStatus)
-    mediaSocket.on('ROOM_STATE',         onRoomState)
-    mediaSocket.on('PARTICIPANT_JOINED', onParticipantJoined)
-    mediaSocket.on('PARTICIPANT_LEFT',   onParticipantLeft)
-    mediaSocket.on('CHAT_MESSAGE',       onChatMessage)
-    mediaSocket.on('PLAY',               onPlay)
-    mediaSocket.on('PAUSE',              onPause)
-    mediaSocket.on('SEEK',               onSeek)
-    mediaSocket.on('SYNC',               onSync)
-    mediaSocket.on('MEDIA_SELECTED',     onMediaSelected)
-    mediaSocket.on('PLAYLIST_UPDATED',   onPlaylistUpdated)
+    mediaSocket.on('CONNECTION_STATUS',   onConnStatus)
+    mediaSocket.on('ROOM_STATE',          onRoomState)
+    mediaSocket.on('PARTICIPANT_JOINED',  onParticipantJoined)
+    mediaSocket.on('PARTICIPANT_LEFT',    onParticipantLeft)
+    mediaSocket.on('CHAT_MESSAGE',        onChatMessage)
+    mediaSocket.on('PLAY',                onPlay)
+    mediaSocket.on('PAUSE',               onPause)
+    mediaSocket.on('SEEK',                onSeek)
+    mediaSocket.on('SYNC',                onSync)
+    mediaSocket.on('MEDIA_SELECTED',      onMediaSelected)
+    mediaSocket.on('PLAYLIST_UPDATED',    onPlaylistUpdated)
     mediaSocket.on('CONTROLLERS_UPDATED', onControllersUpdated)
-    mediaSocket.on('HOST_DISCONNECTED',  onHostDisconnected)
+    mediaSocket.on('HOST_DISCONNECTED',   onHostDisconnected)
+    mediaSocket.on('ROLE',                onRole)
+    mediaSocket.on('HOST_CHANGED',        onHostChanged)
+    mediaSocket.on('KICKED',              onKicked)
+    mediaSocket.on('CONTROL_DENIED',      onControlDenied)
 
     // Connect to room
-    mediaSocket.connect(roomId, isHost, participantName)
+    mediaSocket.connect(roomId, initialIsHost, participantName)
 
     // Cleanup on unmount
     return () => {
-      mediaSocket.off('CONNECTION_STATUS',  onConnStatus)
-      mediaSocket.off('ROOM_STATE',         onRoomState)
-      mediaSocket.off('PARTICIPANT_JOINED', onParticipantJoined)
-      mediaSocket.off('PARTICIPANT_LEFT',   onParticipantLeft)
-      mediaSocket.off('CHAT_MESSAGE',       onChatMessage)
-      mediaSocket.off('PLAY',               onPlay)
-      mediaSocket.off('PAUSE',              onPause)
-      mediaSocket.off('SEEK',               onSeek)
-      mediaSocket.off('SYNC',               onSync)
-      mediaSocket.off('MEDIA_SELECTED',     onMediaSelected)
-      mediaSocket.off('PLAYLIST_UPDATED',   onPlaylistUpdated)
+      mediaSocket.off('CONNECTION_STATUS',   onConnStatus)
+      mediaSocket.off('ROOM_STATE',          onRoomState)
+      mediaSocket.off('PARTICIPANT_JOINED',  onParticipantJoined)
+      mediaSocket.off('PARTICIPANT_LEFT',    onParticipantLeft)
+      mediaSocket.off('CHAT_MESSAGE',        onChatMessage)
+      mediaSocket.off('PLAY',                onPlay)
+      mediaSocket.off('PAUSE',               onPause)
+      mediaSocket.off('SEEK',                onSeek)
+      mediaSocket.off('SYNC',                onSync)
+      mediaSocket.off('MEDIA_SELECTED',      onMediaSelected)
+      mediaSocket.off('PLAYLIST_UPDATED',    onPlaylistUpdated)
       mediaSocket.off('CONTROLLERS_UPDATED', onControllersUpdated)
-      mediaSocket.off('HOST_DISCONNECTED',  onHostDisconnected)
+      mediaSocket.off('HOST_DISCONNECTED',   onHostDisconnected)
+      mediaSocket.off('ROLE',                onRole)
+      mediaSocket.off('HOST_CHANGED',        onHostChanged)
+      mediaSocket.off('KICKED',              onKicked)
+      mediaSocket.off('CONTROL_DENIED',      onControlDenied)
       mediaSocket.disconnect()
     }
-  }, [roomId, isHost, participantName, navigate])
+  }, [roomId, participantName, navigate, searchParams])
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
   const handleFileSelect = async (files) => {
@@ -217,8 +264,13 @@ function Room() {
     mediaSocket.sendChatMessage(message, clientMessageId)
   }
 
-  const handleRemoveParticipant = () => {
-    // Participant management is owned by the realtime server.
+  const handleRemoveParticipant = (targetId) => {
+    if (!isHost || !targetId) return
+    const target = participants.find((p) => p.id === targetId)
+    const targetName = target?.name || 'this participant'
+    if (window.confirm(`Are you sure you want to remove "${targetName}" from the room?`)) {
+      mediaSocket.removeParticipant(targetId)
+    }
   }
 
   const handleLeaveRoom = () => {
@@ -284,7 +336,8 @@ function Room() {
             <>
               <RoomInfo
                 roomId={roomId}
-                isHost={isHost}
+                isHost={true}
+                hasControl={true}
                 participants={participants}
                 onCopy={handleCopyRoomId}
               />
@@ -309,17 +362,31 @@ function Room() {
 
           {/* Passenger Panel — Non-host participants (shows Co-Host controls if granted) */}
           {!isHost && (
-            <PassengerPanel
-              roomId={roomId}
-              hasControl={hasControl}
-              media={media}
-              playlist={playlist}
-              uploadProgress={uploadProgress}
-              onFileSelect={handleFileSelect}
-              onSelectPlaylistItem={handleSelectPlaylistItem}
-              onRemovePlaylistItem={handleRemovePlaylistItem}
-              onLeaveRoom={handleLeaveRoom}
-            />
+            <>
+              <RoomInfo
+                roomId={roomId}
+                isHost={false}
+                hasControl={hasControl}
+                participants={participants}
+                onCopy={handleCopyRoomId}
+              />
+              <div className="sidebar-divider" />
+              <PassengerPanel
+                roomId={roomId}
+                hasControl={hasControl}
+                media={media}
+                playlist={playlist}
+                uploadProgress={uploadProgress}
+                participants={participants}
+                hostId={hostId}
+                myId={myId}
+                controllers={controllers}
+                onFileSelect={handleFileSelect}
+                onSelectPlaylistItem={handleSelectPlaylistItem}
+                onRemovePlaylistItem={handleRemovePlaylistItem}
+                onLeaveRoom={handleLeaveRoom}
+              />
+            </>
           )}
 
           <ChatBox messages={messages} onSend={handleChatSend} />

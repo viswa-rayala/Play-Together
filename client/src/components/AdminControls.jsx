@@ -146,8 +146,11 @@ function AdminControls({
         ) : (
           <ul className="ac-participant-list">
             {participants.map((p) => {
-              const isThisHost = Boolean(p.isHost || (hostId && p.id === hostId) || (isHost && p.id === myId))
-              const isCoHost = !isThisHost && controllers.includes(p.id)
+              const currentHostId = hostId || participants.find((item) => item.isHost)?.id
+              const isThisHost = Boolean(currentHostId ? p.id === currentHostId : p.isHost)
+              const isCoHost = !isThisHost && Array.isArray(controllers) && controllers.includes(p.id)
+              const isMe = Boolean(myId && p.id === myId)
+
               return (
                 <li
                   key={p.id}
@@ -155,13 +158,15 @@ function AdminControls({
                 >
                   <div className="ac-participant-info">
                     <span className="ac-participant-name" title={p.id}>
-                      {p.name}
+                      {p.name} {isMe ? '(You)' : ''}
                     </span>
                     {isThisHost ? (
                       <span className="ac-host-badge">👑 Host</span>
                     ) : isCoHost ? (
                       <span className="ac-cohost-badge">🎮 Co-Host</span>
-                    ) : null}
+                    ) : (
+                      <span className="ac-viewer-badge">👤 Viewer</span>
+                    )}
                   </div>
 
                   <div className="ac-participant-actions">
@@ -185,7 +190,7 @@ function AdminControls({
                           className="ac-kick-btn"
                           onClick={() => onRemoveParticipant?.(p.id)}
                           aria-label={`Remove ${p.name}`}
-                          title={`Kick ${p.name}`}
+                          title={`Remove ${p.name} from room`}
                         >
                           ✕
                         </button>

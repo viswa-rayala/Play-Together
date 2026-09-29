@@ -61,6 +61,11 @@
   color: var(--primary-h);
   border: 1px solid rgba(99,102,241,0.3);
 }
+.ri-role-badge.cohost {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
 .ri-role-badge.participant {
   background: rgba(148,163,184,0.10);
   color: var(--text-muted);

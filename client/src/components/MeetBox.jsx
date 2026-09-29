@@ -129,6 +129,15 @@ function MeetBox({ participantName, isHost, onClose }) {
 
   const joinMeet = async () => {
     setError('')
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        setError('Camera & microphone require a secure connection (HTTPS or localhost). Browsers block camera access over plain HTTP network addresses.')
+      } else {
+        setError('Camera & microphone access is not supported by this browser.')
+      }
+      return
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
@@ -137,8 +146,14 @@ function MeetBox({ participantName, isHost, onClose }) {
       localStreamRef.current = stream
       setJoined(true)
       mediaSocket.sendMeetReady()
-    } catch {
-      setError('Camera and microphone permission is required to join.')
+    } catch (err) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError('Permission denied. Please allow camera and microphone access in your browser.')
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError('No camera or microphone found on this device.')
+      } else {
+        setError('Camera and microphone permission is required to join.')
+      }
     }
   }
 
@@ -161,10 +176,18 @@ function MeetBox({ participantName, isHost, onClose }) {
 
     const nextFacingMode = facingMode === 'user' ? 'environment' : 'user'
     try {
-      const nextStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: nextFacingMode } },
-        audio: false,
-      })
+      let nextStream
+      try {
+        nextStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: nextFacingMode } },
+          audio: false,
+        })
+      } catch {
+        nextStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: nextFacingMode },
+          audio: false,
+        })
+      }
       const nextTrack = nextStream.getVideoTracks()[0]
       const oldTrack = currentStream.getVideoTracks()[0]
       if (!nextTrack) return

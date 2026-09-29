@@ -250,6 +250,16 @@
   gap: 3px;
 }
 
+.ac-viewer-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .ac-participant-actions {
   display: flex;
   align-items: center;

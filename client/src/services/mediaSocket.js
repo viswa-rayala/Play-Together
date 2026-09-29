@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client'
 
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'https://playtogethr.vercel.app'
+const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || `http://${window.location.hostname}:3000`
 const listeners = new Map()
 let socket = null
 let currentRoomId = null
@@ -114,6 +114,10 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('MEET_SIGNAL', (data) => emit('MEET_SIGNAL', data))
   socket.on('MEET_ENDED', () => emit('MEET_ENDED'))
   socket.on('HOST_DISCONNECTED', () => emit('HOST_DISCONNECTED', {}))
+  socket.on('HOST_CHANGED', (data) => emit('HOST_CHANGED', data))
+  socket.on('ROLE', (data) => emit('ROLE', data))
+  socket.on('KICKED', (data) => emit('KICKED', data))
+  socket.on('CONTROL_DENIED', (data) => emit('CONTROL_DENIED', data))
 }
 
 export function uploadMedia(fileOrFiles, onProgress) {
@@ -190,6 +194,7 @@ export function sendAddToPlaylist(items, selectFirst = false) {
 }
 export function sendRemoveFromPlaylist(name) { socket?.emit('REMOVE_FROM_PLAYLIST', { name }) }
 export function sendToggleControl(targetId, grant) { socket?.emit('TOGGLE_CONTROL', { targetId, grant }) }
+export function removeParticipant(targetId) { socket?.emit('REMOVE_PARTICIPANT', { targetId }) }
 export function sendChatMessage(message, clientMessageId) {
   socket?.emit('CHAT_MESSAGE', { message, clientMessageId })
 }
@@ -204,5 +209,5 @@ export default {
   syncClock, getServerTime, getMyId,
   sendPlay, sendPause, sendSeek, sendSync, sendMediaSelected,
   sendPlaylistUpdate, sendAddToPlaylist, sendRemoveFromPlaylist, sendToggleControl,
-  sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
+  removeParticipant, sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,
 }

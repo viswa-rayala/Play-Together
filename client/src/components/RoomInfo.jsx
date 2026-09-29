@@ -11,7 +11,7 @@ import '../styles/RoomInfo.css'
  *   participants {Array<{id:string, name:string}>}
  *   onCopy       {() => void}
  */
-function RoomInfo({ roomId, isHost, participants, onCopy }) {
+function RoomInfo({ roomId, isHost, hasControl, participants, onCopy }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
@@ -42,8 +42,8 @@ function RoomInfo({ roomId, isHost, participants, onCopy }) {
       {/* Role */}
       <div className="ri-row">
         <span className="section-label">Your Role</span>
-        <span className={`ri-role-badge ${isHost ? 'host' : 'participant'}`}>
-          {isHost ? '👑 Host' : '👤 Participant'}
+        <span className={`ri-role-badge ${isHost ? 'host' : hasControl ? 'cohost' : 'participant'}`}>
+          {isHost ? '👑 Host' : hasControl ? '🎮 Co-Host' : '👤 Participant'}
         </span>
       </div>
 

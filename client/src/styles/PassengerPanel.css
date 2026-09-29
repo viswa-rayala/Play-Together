@@ -212,6 +212,88 @@
   background: hsl(0 70% 50% / 0.15);
 }
 
+/* ── In Room Participants List ──────────────────────────────────── */
+.pp-participant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.pp-participant-list::-webkit-scrollbar { width: 4px; }
+.pp-participant-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.pp-participant-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.pp-participant-item.is-host {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+}
+
+.pp-participant-item.is-cohost {
+  border-color: color-mix(in srgb, #f59e0b 60%, var(--border));
+  background: color-mix(in srgb, #f59e0b 10%, var(--surface-2));
+}
+
+.pp-participant-name {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.pp-badge-host {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(99, 102, 241, 0.15);
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  flex-shrink: 0;
+}
+
+.pp-badge-cohost {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  flex-shrink: 0;
+}
+
+.pp-badge-viewer {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: rgba(148, 163, 184, 0.1);
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  flex-shrink: 0;
+}
+
 /* ── Leave button ───────────────────────────────────────────────── */
 .pp-leave-btn {
   width: 100%;

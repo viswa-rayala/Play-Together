@@ -78,6 +78,6 @@ app.get('/api/rooms/:roomId/exists', async (req, res) => {
   }
 })
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`Play Together server running on http://localhost:${port}`)
 })
