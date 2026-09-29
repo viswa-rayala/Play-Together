@@ -331,18 +331,30 @@
 
   .sidebar-divider { display: none; }
 
+  /* No extra padding on mobile — the bottom dock must sit flush at the edge */
   .room-player {
-    padding: 16px;
+    padding: 0;
     min-height: 50vh;
-    align-items: flex-start;
+    align-items: stretch;
+  }
+
+  /* Stage fills remaining space and centres content */
+  .room-player-stage {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Video stage player takes full width on mobile */
+  .room-player-stage .media-player {
+    width: 100%;
+    max-width: 100%;
   }
 
   .room-player .media-player {
     max-width: 100%;
-  }
-
-  .room-player-content {
-    width: 100%;
   }
 }
 

@@ -10,6 +10,11 @@ import ChatBox          from '../components/ChatBox'
 import MeetBox          from '../components/MeetBox'
 import '../styles/Room.css'
 
+const VIDEO_EXTS = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v']
+function isVideoMedia(name = '') {
+  return VIDEO_EXTS.includes((name.split('.').pop() || '').toLowerCase())
+}
+
 /**
  * Room — the main session page.
  *
@@ -323,8 +328,10 @@ function Room() {
 
         {/* ── Player area ── */}
         <main className="room-player">
+          {/* ── Stage: video gets full stage, audio gets ambient card ── */}
           <div className="room-player-stage">
             {!media ? (
+              /* No media yet */
               <div className="no-media">
                 <span className="no-media-icon">{hasControl ? '📂' : '⏳'}</span>
                 <p className="no-media-title">
@@ -333,24 +340,56 @@ function Room() {
                 <p className="no-media-sub">
                   {hasControl
                     ? 'Use the "+ Add Songs / Videos" button in the sidebar to choose video or audio tracks.'
-                    : 'The host hasn\'t selected a media file yet. Hang tight!'}
+                    : "The host hasn't selected a media file yet. Hang tight!"}
                 </p>
               </div>
+            ) : isVideoMedia(media.name) ? (
+              /* VIDEO → render the full player right here in the stage */
+              <MediaPlayer
+                ref={playerRef}
+                src={media.url}
+                mediaName={media.name}
+                isHost={isHost}
+                hasControl={hasControl}
+                playlist={playlist}
+                playing={playing}
+                seekPosition={seekPosition}
+                defaultExpanded
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onSeek={handleSeek}
+                onSync={handleSync}
+                onNextTrack={handleNextTrack}
+                onPrevTrack={handlePrevTrack}
+              />
             ) : (
+              /* AUDIO → ambient card in stage, controls stay in bottom dock */
               <div className="stage-ambient-card">
                 <div className="stage-ambient-glow" />
-                <span className="stage-badge">▶ Playing in Bottom Tab</span>
+                <span className="stage-badge">🎵 Audio Playing</span>
                 <h2 className="stage-title">{media.name}</h2>
                 <p className="stage-sub">
-                  Playback controls are available in the small tab at the bottom
+                  Playback controls are in the bar at the bottom of the screen
                 </p>
               </div>
             )}
           </div>
 
-          {/* ── Small media player tab at the bottom ── */}
+          {/* ── Bottom dock: only shown for audio (video uses stage) ── */}
           <div className="room-bottom-dock">
-            {media ? (
+            {!media || isVideoMedia(media.name) ? (
+              /* Empty state or video (video player is in the stage) */
+              !media && (
+                <div className="mp-tab-empty-bar">
+                  <div className="mp-tab-empty-info">
+                    <span className="mp-tab-empty-icon">🎵</span>
+                    <span className="mp-tab-empty-text">No track playing</span>
+                  </div>
+                  <span className="mp-tab-empty-hint">Upload or select songs/videos from sidebar</span>
+                </div>
+              )
+            ) : (
+              /* AUDIO → player in the bottom dock */
               <MediaPlayer
                 ref={playerRef}
                 src={media.url}
@@ -367,14 +406,6 @@ function Room() {
                 onNextTrack={handleNextTrack}
                 onPrevTrack={handlePrevTrack}
               />
-            ) : (
-              <div className="mp-tab-empty-bar">
-                <div className="mp-tab-empty-info">
-                  <span className="mp-tab-empty-icon">🎵</span>
-                  <span className="mp-tab-empty-text">No track playing</span>
-                </div>
-                <span className="mp-tab-empty-hint">Upload or select songs/videos from sidebar</span>
-              </div>
             )}
           </div>
         </main>

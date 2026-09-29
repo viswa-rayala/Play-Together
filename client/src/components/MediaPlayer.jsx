@@ -34,6 +34,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     playlist = [],
     playing,
     seekPosition,
+    defaultExpanded = false,
     onPlay,
     onPause,
     onSeek,
@@ -49,7 +50,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const [isVideo,     setIsVideo]     = useState(true)
   const [autoplayBlocked, setAutoplayBlocked] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [accentColor, setAccentColor] = useState('#6366f1')
   const prevPlayingRef  = useRef(playing)
   const prevSeekRef     = useRef(seekPosition)
@@ -63,10 +64,12 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     getDuration:    () => mediaRef.current?.duration    ?? 0,
   }))
 
-  // Detect media type when filename changes
+  // Detect media type when filename changes; honour defaultExpanded for videos
   useEffect(() => {
-    setIsVideo(VIDEO_EXTS.includes(getExt(mediaName)))
-  }, [mediaName])
+    const isVid = VIDEO_EXTS.includes(getExt(mediaName))
+    setIsVideo(isVid)
+    if (defaultExpanded) setIsExpanded(true)
+  }, [mediaName, defaultExpanded])
 
   // Sync play/pause state from parent
   useEffect(() => {
