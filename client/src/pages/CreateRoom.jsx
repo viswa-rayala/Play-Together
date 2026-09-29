@@ -90,6 +90,19 @@ function CreateRoom() {
           {creating ? '⏳ Creating…' : '🎬 Create Room'}
         </button>
 
+        {creating && (
+          <div className="create-loading-notice" role="status">
+            <span>Waking up server… this may take 10–20s if waking from idle sleep.</span>
+          </div>
+        )}
+
+        <div className="server-wake-note">
+          <span className="wake-icon" aria-hidden="true">💡</span>
+          <p className="wake-text">
+            <strong>Note:</strong> Creating a room may sometimes take around <strong>10 to 20 seconds</strong> because on free hosting (Render), the server goes to sleep after 15 minutes of inactivity.
+          </p>
+        </div>
+
         <p className="create-hint">Everyone must be on the same Wi-Fi / hotspot</p>
       </div>
     </div>

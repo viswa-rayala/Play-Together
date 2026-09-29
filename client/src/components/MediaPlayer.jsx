@@ -1,4 +1,5 @@
 import { forwardRef, useRef, useEffect, useState, useImperativeHandle } from 'react'
+import { getServerTime } from '../services/mediaSocket'
 import '../styles/MediaPlayer.css'
 
 const VIDEO_EXTS = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v']
@@ -34,6 +35,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     playlist = [],
     playing,
     seekPosition,
+    scheduledPlay = null,
     defaultExpanded = false,
     onPlay,
     onPause,
@@ -56,6 +58,7 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const prevPlayingRef  = useRef(playing)
   const prevSeekRef     = useRef(seekPosition)
   const playerShellRef  = useRef(null)
+  const scheduledTimerRef = useRef(null)
 
   const userCanControl = Boolean(isHost || hasControl)
 
@@ -72,6 +75,54 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     if (defaultExpanded) setIsExpanded(true)
   }, [mediaName, defaultExpanded])
 
+  // Scheduled future playback execution (Beatsync-style synchronized start)
+  useEffect(() => {
+    if (!scheduledPlay) return
+    const el = mediaRef.current
+    if (!el) return
+
+    if (scheduledTimerRef.current) {
+      clearTimeout(scheduledTimerRef.current)
+      scheduledTimerRef.current = null
+    }
+
+    const { position, scheduledAt } = scheduledPlay
+    const now = getServerTime()
+    const delayMs = scheduledAt - now
+
+    // Pre-cue target position so decoder buffer is ready immediately
+    if (Math.abs(el.currentTime - position) > 0.04) {
+      el.currentTime = position
+    }
+
+    if (delayMs > 0) {
+      scheduledTimerRef.current = setTimeout(() => {
+        const currentNow = getServerTime()
+        const driftSec = (currentNow - scheduledAt) / 1000
+        if (Math.abs(driftSec) > 0.06) {
+          el.currentTime = position + Math.max(0, driftSec)
+        }
+        el.play()
+          .then(() => setAutoplayBlocked(false))
+          .catch(() => setAutoplayBlocked(true))
+        scheduledTimerRef.current = null
+      }, delayMs)
+    } else {
+      const elapsed = Math.max(0, (now - scheduledAt) / 1000)
+      el.currentTime = position + elapsed
+      el.play()
+        .then(() => setAutoplayBlocked(false))
+        .catch(() => setAutoplayBlocked(true))
+    }
+
+    return () => {
+      if (scheduledTimerRef.current) {
+        clearTimeout(scheduledTimerRef.current)
+        scheduledTimerRef.current = null
+      }
+    }
+  }, [scheduledPlay])
+
   // Sync play/pause state from parent
   useEffect(() => {
     if (prevPlayingRef.current === playing) return
@@ -79,14 +130,22 @@ const MediaPlayer = forwardRef(function MediaPlayer(
     const el = mediaRef.current
     if (!el) return
     if (playing) {
-      el.play()
-        .then(() => setAutoplayBlocked(false))
-        .catch(() => setAutoplayBlocked(true))
+      // If a future scheduled play is pending, let scheduledTimer execute the start
+      const isWaitingSchedule = scheduledPlay && (scheduledPlay.scheduledAt > getServerTime())
+      if (!isWaitingSchedule) {
+        el.play()
+          .then(() => setAutoplayBlocked(false))
+          .catch(() => setAutoplayBlocked(true))
+      }
     } else {
+      if (scheduledTimerRef.current) {
+        clearTimeout(scheduledTimerRef.current)
+        scheduledTimerRef.current = null
+      }
       el.pause()
       el.playbackRate = 1.0 // Reset rate on pause
     }
-  }, [playing])
+  }, [playing, scheduledPlay])
 
   useEffect(() => {
     setAutoplayBlocked(false)
@@ -123,12 +182,12 @@ const MediaPlayer = forwardRef(function MediaPlayer(
         // Hard seek if significantly out of sync (e.g. host seek or network stall)
         el.currentTime = seekPosition
         el.playbackRate = 1.0
-      } else if (Math.abs(diff) <= 0.04) {
-        // Deadband: within ±40ms is considered in perfect sync (no speed oscillation)
+      } else if (Math.abs(diff) <= 0.03) {
+        // Beatsync-style deadband: within ±30ms is considered in sync (no speed oscillation)
         el.playbackRate = 1.0
       } else {
-        // Proportional speed adjustment (clamped between 0.95x and 1.05x)
-        const adjustment = Math.min(Math.max(diff * 0.25, -0.05), 0.05)
+        // Proportional speed adjustment (clamped between 0.96x and 1.04x)
+        const adjustment = Math.min(Math.max(diff * 0.25, -0.04), 0.04)
         el.playbackRate = 1.0 + adjustment
       }
     } else {
@@ -160,13 +219,16 @@ const MediaPlayer = forwardRef(function MediaPlayer(
   const handlePlayClick = () => {
     const el = mediaRef.current
     if (!el || !userCanControl) return
-    el.play().catch(() => {})
     onPlay?.(el.currentTime)
   }
 
   const handlePauseClick = () => {
     const el = mediaRef.current
     if (!el || !userCanControl) return
+    if (scheduledTimerRef.current) {
+      clearTimeout(scheduledTimerRef.current)
+      scheduledTimerRef.current = null
+    }
     el.pause()
     onPause?.(el.currentTime)
   }

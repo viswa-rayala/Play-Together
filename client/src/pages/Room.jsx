@@ -42,9 +42,11 @@ function Room() {
   const [messages,       setMessages]       = useState([])
   const [playing,       setPlaying]      = useState(false)
   const [seekPosition,  setSeekPosition] = useState(0)
+  const [scheduledPlay, setScheduledPlay] = useState(null)
   const [showMeet,      setShowMeet]     = useState(false)
 
   const playerRef = useRef(null)
+  const playFallbackTimerRef = useRef(null)
 
   // A user has control if they are the Room Host or have been granted Co-Host control
   const hasControl = isHost || (Boolean(myId) && controllers.includes(myId))
@@ -95,17 +97,47 @@ function Room() {
         ? current
         : [...current, message].slice(-100)
     ))
-    const onPlay    = ({ position, serverTime }) => {
+    const onPlay    = ({ position, serverTime, scheduledAt }) => {
+      if (playFallbackTimerRef.current) {
+        clearTimeout(playFallbackTimerRef.current)
+        playFallbackTimerRef.current = null
+      }
       setPlaying(true)
-      if (serverTime) {
-        const elapsed = Math.max(0, (mediaSocket.getServerTime() - serverTime) / 1000)
-        setSeekPosition(position + elapsed)
-      } else {
+      const now = mediaSocket.getServerTime()
+      if (scheduledAt && scheduledAt > now) {
         setSeekPosition(position)
+        setScheduledPlay({ position, scheduledAt, serverTime })
+      } else {
+        const baseTime = scheduledAt || serverTime
+        const elapsed = baseTime ? Math.max(0, (now - baseTime) / 1000) : 0
+        setSeekPosition(position + elapsed)
+        setScheduledPlay(null)
       }
     }
-    const onPause   = ({ position }) => { setPlaying(false); setSeekPosition(position) }
-    const onSeek    = ({ position }) => setSeekPosition(position)
+    const onPause   = ({ position }) => {
+      if (playFallbackTimerRef.current) {
+        clearTimeout(playFallbackTimerRef.current)
+        playFallbackTimerRef.current = null
+      }
+      setScheduledPlay(null)
+      setPlaying(false)
+      setSeekPosition(position)
+    }
+    const onSeek    = ({ position, scheduledAt, serverTime, playing: isStillPlaying }) => {
+      if (typeof isStillPlaying === 'boolean') {
+        setPlaying(isStillPlaying)
+      }
+      const now = mediaSocket.getServerTime()
+      if (scheduledAt && scheduledAt > now) {
+        setSeekPosition(position)
+        setScheduledPlay({ position, scheduledAt, serverTime })
+      } else {
+        const baseTime = scheduledAt || serverTime
+        const elapsed = (isStillPlaying && baseTime) ? Math.max(0, (now - baseTime) / 1000) : 0
+        setSeekPosition(position + elapsed)
+        setScheduledPlay(null)
+      }
+    }
     const onSync    = ({ position, playing, serverTime }) => {
       setPlaying(playing)
       if (playing && serverTime) {
@@ -197,6 +229,10 @@ function Room() {
       mediaSocket.off('HOST_CHANGED',        onHostChanged)
       mediaSocket.off('KICKED',              onKicked)
       mediaSocket.off('CONTROL_DENIED',      onControlDenied)
+      if (playFallbackTimerRef.current) {
+        clearTimeout(playFallbackTimerRef.current)
+        playFallbackTimerRef.current = null
+      }
       mediaSocket.disconnect()
     }
   }, [roomId, participantName, navigate, searchParams])
@@ -253,9 +289,35 @@ function Room() {
     handleSelectPlaylistItem(playlist[prevIndex])
   }
 
-  const handlePlay  = (pos) => { setPlaying(true);  setSeekPosition(pos); mediaSocket.sendPlay(pos) }
-  const handlePause = (pos) => { setPlaying(false); setSeekPosition(pos); mediaSocket.sendPause(pos) }
-  const handleSeek  = (pos) => { setSeekPosition(pos); mediaSocket.sendSeek(pos) }
+  const handlePlay  = (pos) => {
+    if (mediaSocket.isConnected()) {
+      mediaSocket.sendPlay(pos)
+      if (playFallbackTimerRef.current) clearTimeout(playFallbackTimerRef.current)
+      playFallbackTimerRef.current = setTimeout(() => {
+        setPlaying(true)
+        setSeekPosition(pos)
+      }, 400)
+    } else {
+      setPlaying(true)
+      setSeekPosition(pos)
+    }
+  }
+
+  const handlePause = (pos) => {
+    if (playFallbackTimerRef.current) {
+      clearTimeout(playFallbackTimerRef.current)
+      playFallbackTimerRef.current = null
+    }
+    setScheduledPlay(null)
+    setPlaying(false)
+    setSeekPosition(pos)
+    mediaSocket.sendPause(pos)
+  }
+
+  const handleSeek  = (pos) => {
+    setSeekPosition(pos)
+    mediaSocket.sendSeek(pos)
+  }
   const handleSync  = (pos, isPlaying) => { mediaSocket.sendSync(pos, isPlaying) }
   const handleChatSend = (message) => {
     const clientMessageId = `${participantName}-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -421,6 +483,7 @@ function Room() {
                 playlist={playlist}
                 playing={playing}
                 seekPosition={seekPosition}
+                scheduledPlay={scheduledPlay}
                 defaultExpanded
                 onPlay={handlePlay}
                 onPause={handlePause}
@@ -466,6 +529,7 @@ function Room() {
                 playlist={playlist}
                 playing={playing}
                 seekPosition={seekPosition}
+                scheduledPlay={scheduledPlay}
                 onPlay={handlePlay}
                 onPause={handlePause}
                 onSeek={handleSeek}

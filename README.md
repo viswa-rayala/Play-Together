@@ -45,6 +45,8 @@ Browser (React + Vite)
 - **Host** creates a room with a custom or auto-generated 6-character alphanumeric ID.
 - **Participants** join by entering the shared room ID and a display name.
 - Room IDs are validated for format (A-Z, 0-9, 4-10 characters).
+- **Free-Tier Server Spin-Up (10–20s):** On free hosting providers such as Render, web services automatically go to sleep after 15 minutes of inactivity. When creating a room after an idle period, the initial request may take approximately 10 to 20 seconds while the server wakes up.
+
 
 ### Synchronized Playback
 

@@ -93,3 +93,5 @@ After deployment, verify all services respond:
 - Do not put `SUPABASE_SERVICE_ROLE_KEY` into the client app.
 - The media server needs a public URL because the browser connects to it directly.
 - The API and media services should be deployed as separate services because they are independent Node apps.
+- **Render Free-Tier Spin-Down:** Render free web services automatically go to sleep after 15 minutes of inactivity. When creating a room or making the initial connection after an idle period, the first request may take around 10 to 20 seconds while the instance spins up.
+

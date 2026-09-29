@@ -15,20 +15,87 @@ function mediaUrl(name) {
   return `${MEDIA_URL}/media/${encodeURIComponent(name)}`
 }
 
-export function syncClock() {
-  if (!socket || !socket.connected) return
-  const t0 = Date.now()
-  socket.emit('TIME_REQUEST')
-  socket.once('TIME_RESPONSE', ({ serverTime }) => {
+let isCalibrating = false
+let calibrated = false
+
+/**
+ * Multi-sample NTP clock synchronization with outlier rejection (Beatsync style).
+ * Sends a burst of ping packets to calculate Round-Trip-Time (RTT) and clock offset.
+ * Discards high-RTT outliers and calculates a robust average from the lowest-latency samples.
+ */
+export function syncClock(burstCount = 6) {
+  if (!socket || !socket.connected || isCalibrating) return
+  isCalibrating = true
+
+  const samples = []
+  let pingIndex = 0
+
+  const onResponse = (payload) => {
     const t1 = Date.now()
-    const rtt = t1 - t0
-    // NTP formula: offset = serverTime - (t0 + rtt / 2)
-    serverOffset = Number(serverTime) - (t0 + rtt / 2)
-  })
+    const sendTime = payload?.clientTime ?? (t1 - 10)
+    const serverTime = Number(payload?.serverTime) || t1
+    const rtt = Math.max(1, t1 - sendTime)
+
+    // Standard NTP clock offset formula: serverTime - (clientTime + rtt / 2)
+    const offset = serverTime - (sendTime + rtt / 2)
+    samples.push({ rtt, offset })
+
+    pingIndex++
+    if (pingIndex < burstCount) {
+      setTimeout(sendPing, 35)
+    } else {
+      finishCalibration()
+    }
+  }
+
+  const sendPing = () => {
+    if (!socket || !socket.connected) {
+      finishCalibration()
+      return
+    }
+    const t0 = Date.now()
+    socket.emit('TIME_REQUEST', { clientTime: t0 })
+  }
+
+  const finishCalibration = () => {
+    if (socket) {
+      socket.off('TIME_RESPONSE', onResponse)
+    }
+    isCalibrating = false
+
+    if (samples.length === 0) return
+
+    // Sort by lowest RTT (samples with minimal network buffering and asymmetry)
+    samples.sort((a, b) => a.rtt - b.rtt)
+
+    // Select the best 50% lowest-latency samples (minimum 1)
+    const bestCount = Math.max(1, Math.floor(samples.length / 2))
+    const bestSamples = samples.slice(0, bestCount)
+    const burstAvgOffset = bestSamples.reduce((acc, s) => acc + s.offset, 0) / bestSamples.length
+
+    if (!calibrated) {
+      serverOffset = burstAvgOffset
+      calibrated = true
+    } else {
+      // Exponential moving average: smooth transition without sudden playback jumps
+      serverOffset = (serverOffset * 0.65) + (burstAvgOffset * 0.35)
+    }
+  }
+
+  socket.on('TIME_RESPONSE', onResponse)
+  sendPing()
 }
 
 export function getServerTime() {
   return Date.now() + serverOffset
+}
+
+export function getServerOffset() {
+  return serverOffset
+}
+
+export function isConnected() {
+  return Boolean(socket && socket.connected)
 }
 
 export function on(event, callback) {
@@ -53,9 +120,9 @@ export function connect(roomId, isHost, participantName = 'Participant') {
 
   socket.on('connect', () => {
     emit('CONNECTION_STATUS', { status: 'connected' })
-    syncClock()
+    syncClock(8) // Initial high-accuracy 8-ping burst
     if (clockSyncInterval) clearInterval(clockSyncInterval)
-    clockSyncInterval = setInterval(syncClock, 10000)
+    clockSyncInterval = setInterval(() => syncClock(4), 8000) // Periodic EMA tracking
   })
   socket.on('disconnect', () => emit('CONNECTION_STATUS', { status: 'disconnected' }))
   socket.on('connect_error', (error) => {
@@ -100,11 +167,12 @@ export function connect(roomId, isHost, participantName = 'Participant') {
   socket.on('CONTROLLERS_UPDATED', ({ controllers }) => {
     emit('CONTROLLERS_UPDATED', { controllers: controllers || [] })
   })
-  socket.on('PLAY', ({ position, serverTime }) => emit('PLAY', { position, serverTime }))
-  socket.on('PLAY_CONFIRMED', ({ position }) => emit('PLAY', { position }))
-  socket.on('PAUSE', ({ position }) => emit('PAUSE', { position }))
-  socket.on('SEEK', ({ position }) => emit('SEEK', { position }))
-  socket.on('SYNC', ({ position, playing, serverTime }) => emit('SYNC', { position, playing, serverTime }))
+  socket.on('PLAY', (data) => emit('PLAY', data))
+  socket.on('PLAY_CONFIRMED', (data) => emit('PLAY', data))
+  socket.on('PAUSE', (data) => emit('PAUSE', data))
+  socket.on('SEEK', (data) => emit('SEEK', data))
+  socket.on('SEEK_CONFIRMED', (data) => emit('SEEK', data))
+  socket.on('SYNC', (data) => emit('SYNC', data))
   socket.on('PARTICIPANT_JOINED', (data) => emit('PARTICIPANT_JOINED', data))
   socket.on('PARTICIPANT_LEFT', (data) => emit('PARTICIPANT_LEFT', data))
   socket.on('CHAT_MESSAGE', (message) => emit('CHAT_MESSAGE', message))
@@ -206,7 +274,7 @@ export function sendMeetEnd() { socket?.emit('MEET_END') }
 
 export default {
   on, off, connect, disconnect, leaveRoom, uploadMedia,
-  syncClock, getServerTime, getMyId,
+  syncClock, getServerTime, getServerOffset, isConnected, getMyId,
   sendPlay, sendPause, sendSeek, sendSync, sendMediaSelected,
   sendPlaylistUpdate, sendAddToPlaylist, sendRemoveFromPlaylist, sendToggleControl,
   removeParticipant, sendChatMessage, sendMeetSignal, sendMeetReady, sendMeetEnd,

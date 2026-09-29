@@ -337,13 +337,15 @@ io.on("connection", socket => {
 
     socket.on(
         "TIME_REQUEST",
-        () => {
+        (data) => {
 
             socket.emit(
                 "TIME_RESPONSE",
                 {
                     serverTime:
-                        Date.now()
+                        Date.now(),
+                    clientTime:
+                        data?.clientTime
                 }
             );
         }
@@ -590,13 +592,19 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
+            // Beatsync-style scheduled start: 200ms lead time allows all devices
+            // to buffer and start audio rendering at the exact same physical millisecond.
+            const SCHEDULE_LEAD_MS = 200;
+            const scheduledAt = roomState.updatedAt + SCHEDULE_LEAD_MS;
+
             socket.to(roomId).emit(
                 "PLAY",
                 {
                     position:
                         roomState.position,
                     serverTime:
-                        roomState.updatedAt
+                        roomState.updatedAt,
+                    scheduledAt
                 }
             );
 
@@ -606,7 +614,8 @@ io.on("connection", socket => {
                     position:
                         roomState.position,
                     serverTime:
-                        roomState.updatedAt
+                        roomState.updatedAt,
+                    scheduledAt
                 }
             );
         }
@@ -663,11 +672,33 @@ io.on("connection", socket => {
             roomState.updatedAt =
                 Date.now();
 
+            // When seeking while actively playing, give 150ms lead time for synchronized restart
+            const SCHEDULE_LEAD_MS = roomState.playing ? 150 : 0;
+            const scheduledAt = roomState.updatedAt + SCHEDULE_LEAD_MS;
+
             socket.to(roomId).emit(
                 "SEEK",
                 {
                     position:
-                        roomState.position
+                        roomState.position,
+                    serverTime:
+                        roomState.updatedAt,
+                    scheduledAt,
+                    playing:
+                        roomState.playing
+                }
+            );
+
+            socket.emit(
+                "SEEK_CONFIRMED",
+                {
+                    position:
+                        roomState.position,
+                    serverTime:
+                        roomState.updatedAt,
+                    scheduledAt,
+                    playing:
+                        roomState.playing
                 }
             );
         }
