@@ -44,9 +44,22 @@ function Room() {
   const [seekPosition,  setSeekPosition] = useState(0)
   const [scheduledPlay, setScheduledPlay] = useState(null)
   const [showMeet,      setShowMeet]     = useState(false)
+  const [activeMobileTab, setActiveMobileTab] = useState('player')
+  const [unreadChat,    setUnreadChat]    = useState(0)
 
   const playerRef = useRef(null)
   const playFallbackTimerRef = useRef(null)
+  const roomColsRef = useRef(null)
+  const colRoomRef = useRef(null)
+  const colPlayerRef = useRef(null)
+  const colChatRef = useRef(null)
+  const isProgrammaticScrollRef = useRef(false)
+  const activeMobileTabRef = useRef(activeMobileTab)
+
+  // Keep activeMobileTabRef in sync for socket callbacks
+  useEffect(() => {
+    activeMobileTabRef.current = activeMobileTab
+  }, [activeMobileTab])
 
   // A user has control if they are the Room Host or have been granted Co-Host control
   const hasControl = isHost || (Boolean(myId) && controllers.includes(myId))
@@ -92,11 +105,18 @@ function Room() {
       if (data?.participants) setParticipants(data.participants)
       if (data?.hostId) setHostId(data.hostId)
     }
-    const onChatMessage = (message) => setMessages((current) => (
-      current.some((item) => item.id === message.id)
-        ? current
-        : [...current, message].slice(-100)
-    ))
+    const onChatMessage = (message) => {
+      setMessages((current) => (
+        current.some((item) => item.id === message.id)
+          ? current
+          : [...current, message].slice(-100)
+      ))
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        if (activeMobileTabRef.current !== 'chat') {
+          setUnreadChat((prev) => prev + 1)
+        }
+      }
+    }
     const onPlay    = ({ position, serverTime, scheduledAt }) => {
       if (playFallbackTimerRef.current) {
         clearTimeout(playFallbackTimerRef.current)
@@ -344,6 +364,80 @@ function Room() {
     navigator.clipboard.writeText(roomId).catch(() => {})
   }
 
+  // ── Phone Dashboard Tab Navigation & Scroll Sync ──────────────────────────
+  const handleSelectTab = (tab) => {
+    setActiveMobileTab(tab)
+    if (tab === 'chat') {
+      setUnreadChat(0)
+    }
+    const container = roomColsRef.current
+    const targetMap = {
+      room: colRoomRef.current,
+      player: colPlayerRef.current,
+      chat: colChatRef.current,
+    }
+    const targetEl = targetMap[tab]
+    if (container && targetEl) {
+      isProgrammaticScrollRef.current = true
+      container.scrollTo({
+        left: targetEl.offsetLeft,
+        behavior: 'smooth',
+      })
+      setTimeout(() => {
+        isProgrammaticScrollRef.current = false
+      }, 400)
+    }
+  }
+
+  const handleColsScroll = () => {
+    if (isProgrammaticScrollRef.current) return
+    const container = roomColsRef.current
+    if (!container) return
+    const scrollLeft = container.scrollLeft
+    const width = container.clientWidth
+    if (width <= 0) return
+    const tabIndex = Math.round(scrollLeft / width)
+    const tabs = ['room', 'player', 'chat']
+    const nextTab = tabs[tabIndex] || 'player'
+    if (nextTab !== activeMobileTab) {
+      setActiveMobileTab(nextTab)
+      if (nextTab === 'chat') {
+        setUnreadChat(0)
+      }
+    }
+  }
+
+  // On phone load, scroll immediately to middle column (Media Player)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      const timer = setTimeout(() => {
+        if (roomColsRef.current && colPlayerRef.current) {
+          roomColsRef.current.scrollLeft = colPlayerRef.current.offsetLeft
+        }
+      }, 60)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  // Keep phone columns aligned on window resize or orientation flip
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768 && roomColsRef.current) {
+        const targetMap = {
+          room: colRoomRef.current,
+          player: colPlayerRef.current,
+          chat: colChatRef.current,
+        }
+        const targetEl = targetMap[activeMobileTab] || colPlayerRef.current
+        if (targetEl) {
+          roomColsRef.current.scrollLeft = targetEl.offsetLeft
+        }
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [activeMobileTab])
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="room-wrap">
@@ -387,14 +481,48 @@ function Room() {
         </div>
       </header>
 
-      {/* ── Main layout (sidebar + player) ── */}
-      <div className="room-main">
+      {/* ── Mobile Phone Dashboard Navigation Bar (Hidden on desktop) ── */}
+      <nav className="room-phone-nav" aria-label="Dashboard columns">
+        <button
+          type="button"
+          className={`phone-nav-tab ${activeMobileTab === 'room' ? 'active' : ''}`}
+          onClick={() => handleSelectTab('room')}
+        >
+          <span className="phone-nav-icon">👥</span>
+          <span className="phone-nav-label phone-label-full">Room & Media</span>
+          <span className="phone-nav-label phone-label-short">Room</span>
+        </button>
+        <button
+          type="button"
+          className={`phone-nav-tab ${activeMobileTab === 'player' ? 'active' : ''}`}
+          onClick={() => handleSelectTab('player')}
+        >
+          <span className="phone-nav-icon">🎬</span>
+          <span className="phone-nav-label">Player</span>
+          {playing && <span className="phone-nav-pulse" />}
+        </button>
+        <button
+          type="button"
+          className={`phone-nav-tab ${activeMobileTab === 'chat' ? 'active' : ''}`}
+          onClick={() => handleSelectTab('chat')}
+        >
+          <span className="phone-nav-icon">💬</span>
+          <span className="phone-nav-label">Chat</span>
+          {unreadChat > 0 && (
+            <span className="phone-nav-badge">{unreadChat > 99 ? '99+' : unreadChat}</span>
+          )}
+        </button>
+      </nav>
 
-        {/* ── Sidebar ── */}
-        <aside className="room-sidebar">
-
-          {/* Admin Panel — host only */}
-          {isHost && (
+      {/* ── 3-Column Dashboard Layout (Left: Room & Media | Middle: Player | Right: Chat) ── */}
+      <div
+        className="room-dashboard-cols"
+        ref={roomColsRef}
+        onScroll={handleColsScroll}
+      >
+        {/* ── Column 1: Room & Media (Left) ── */}
+        <aside className="room-col room-col-room" ref={colRoomRef}>
+          {isHost ? (
             <>
               <RoomInfo
                 roomId={roomId}
@@ -420,10 +548,7 @@ function Room() {
                 onRemoveParticipant={handleRemoveParticipant}
               />
             </>
-          )}
-
-          {/* Passenger Panel — Non-host participants (shows Co-Host controls if granted) */}
-          {!isHost && (
+          ) : (
             <>
               <RoomInfo
                 roomId={roomId}
@@ -450,17 +575,13 @@ function Room() {
               />
             </>
           )}
-
-          <ChatBox messages={messages} onSend={handleChatSend} />
-
         </aside>
 
-        {/* ── Player area ── */}
-        <main className="room-player">
-          {/* ── Stage: video gets full stage, audio gets ambient card ── */}
+        {/* ── Column 2: Media Player & Playback Stage (Middle) ── */}
+        <main className="room-col room-col-player" ref={colPlayerRef}>
+          {/* Stage: video gets full stage, audio gets ambient card */}
           <div className="room-player-stage">
             {!media ? (
-              /* No media yet */
               <div className="no-media">
                 <span className="no-media-icon">{hasControl ? '📂' : '⏳'}</span>
                 <p className="no-media-title">
@@ -468,12 +589,11 @@ function Room() {
                 </p>
                 <p className="no-media-sub">
                   {hasControl
-                    ? 'Use the "+ Add Songs / Videos" button in the sidebar to choose video or audio tracks.'
+                    ? 'Use the "+ Add Songs / Videos" button in the Room & Media tab to choose video or audio tracks.'
                     : "The host hasn't selected a media file yet. Hang tight!"}
                 </p>
               </div>
             ) : isVideoMedia(media.name) ? (
-              /* VIDEO → render the full player right here in the stage */
               <MediaPlayer
                 ref={playerRef}
                 src={media.url}
@@ -493,7 +613,6 @@ function Room() {
                 onPrevTrack={handlePrevTrack}
               />
             ) : (
-              /* AUDIO → ambient card in stage, controls stay in bottom dock */
               <div className="stage-ambient-card">
                 <div className="stage-ambient-glow" />
                 <span className="stage-badge">🎵 Audio Playing</span>
@@ -505,21 +624,19 @@ function Room() {
             )}
           </div>
 
-          {/* ── Bottom dock: only shown for audio (video uses stage) ── */}
+          {/* Bottom dock: only shown for audio (video uses stage) */}
           <div className="room-bottom-dock">
             {!media || isVideoMedia(media.name) ? (
-              /* Empty state or video (video player is in the stage) */
               !media && (
                 <div className="mp-tab-empty-bar">
                   <div className="mp-tab-empty-info">
                     <span className="mp-tab-empty-icon">🎵</span>
                     <span className="mp-tab-empty-text">No track playing</span>
                   </div>
-                  <span className="mp-tab-empty-hint">Upload or select songs/videos from sidebar</span>
+                  <span className="mp-tab-empty-hint">Upload or select songs/videos from Room & Media</span>
                 </div>
               )
             ) : (
-              /* AUDIO → player in the bottom dock */
               <MediaPlayer
                 ref={playerRef}
                 src={media.url}
@@ -540,6 +657,11 @@ function Room() {
             )}
           </div>
         </main>
+
+        {/* ── Column 3: Live Room Chat (Right) ── */}
+        <section className="room-col room-col-chat" ref={colChatRef}>
+          <ChatBox messages={messages} onSend={handleChatSend} />
+        </section>
       </div>
 
       {/* ── Floating Video Meet Overlay ── */}
