@@ -7,11 +7,10 @@ Play Together is a React application for shared media rooms. A host creates a ro
 ```text
 Browser (React + Vite)
    |
-   |-- HTTP --> Express API (server/)
-   |            Room creation and validation (in-memory)
-   |
-   +-- Socket.IO + HTTP --> Media Server (src/mediaServer.cjs)
-                               |  File upload and byte-range streaming
+   +-- HTTP + Socket.IO --> Unified Backend Server (src/mediaServer.cjs)
+                               |  Room creation and validation (/api/rooms/...)
+                               |  Uptime health check (/health)
+                               |  File upload and byte-range streaming (/upload, /media/...)
                                |  Room playback state management
                                |  NTP clock calibration & scheduled future playback
                                |  Real-time chat (latest 100 messages)
@@ -25,8 +24,8 @@ Browser (React + Vite)
 | Path | Purpose |
 |---|---|
 | `client/` | React + Vite frontend |
-| `server/` | Express room-registry API |
-| `src/mediaServer.cjs` | Socket.IO + media-streaming service |
+| `src/mediaServer.cjs` | Unified Express + Socket.IO backend service (REST API, Room registry & media streaming) |
+| `server/` | Standalone Express room-registry (legacy/optional) |
 | `media/` | Uploaded files (runtime, not committed) |
 | `public/` | Static assets served by the media server |
 

@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_MEDIA_URL || `http://${window.location.hostname}:3000`
 
 async function request(path, options = {}) {
   let response
@@ -12,7 +12,7 @@ async function request(path, options = {}) {
       ...options,
     })
   } catch {
-    throw new Error(`Cannot reach the backend at ${API_URL}. Start it with: npm --prefix server run dev`)
+    throw new Error(`Cannot reach the backend at ${API_URL}. Start it with: npm run dev`)
   }
 
   const data = await response.json().catch(() => ({}))

@@ -1,55 +1,29 @@
 # Deployment Guide
 
-This project is best deployed as a three-part stack:
+This project is deployed as an efficient two-part stack:
 
-- Vercel: frontend React app
-- Render: Express API
-- Render: Socket.IO media server
-- Supabase: database
+- **Vercel**: Frontend React app (fast, global CDN, never sleeps)
+- **Render**: Unified Backend service (handles REST API, Room Registry, Socket.IO, media streaming & Meet signaling)
+
+---
 
 ## 1) Prerequisites
 
 - GitHub repository pushed to GitHub
 - Vercel account
 - Render account
-- Supabase project already created
+- (Optional) UptimeRobot account (to keep Render awake 24/7)
 
-## 2) Supabase setup
+---
 
-1. Create a Supabase project.
-2. Open the SQL editor and run the schema from `server/schema.sql`.
-3. Copy the project URL and service role key.
-4. Keep the service role key secret and never expose it in the frontend.
+## 2) Deploy the Unified Backend on Render
 
-## 3) Deploy the API service on Render
+Deploy a single Web Service on Render:
 
-Create a new Web Service on Render with:
-
-- Root directory: `server`
-- Build command: `npm install`
-- Start command: `npm run start`
-
-Environment variables:
-
-```env
-PORT=10000
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-After deployment, copy the public URL, for example:
-
-```text
-https://play-together-api.onrender.com
-```
-
-## 4) Deploy the media service on Render
-
-Create another Web Service on Render with:
-
-- Root directory: `.`
-- Build command: `npm install`
-- Start command: `npm run media:prod`
+- **Root directory**: `.` (leave empty or set to repository root)
+- **Environment**: Node
+- **Build command**: `npm install`
+- **Start command**: `npm run start` (or `node src/mediaServer.cjs`)
 
 Environment variables:
 
@@ -57,41 +31,62 @@ Environment variables:
 PORT=10000
 ```
 
-After deployment, copy the public URL, for example:
+After deployment, copy your public service URL, for example:
 
 ```text
-https://play-together-media.onrender.com
+https://play-together-backend.onrender.com
 ```
 
-## 5) Deploy the frontend on Vercel
+---
 
-Import the repository into Vercel.
+## 3) Set Up UptimeRobot (Keep Awake 24/7)
 
-Set the project root to the `client` folder.
+Render's free tier provides **750 free instance hours/month**. With 1 unified service running 24/7:
+$$1 \text{ service} \times 24 \text{ hours} \times 31 \text{ days} = 744 \text{ hours} \le 750 \text{ hours}$$
+Your single service stays awake the entire month without exhausting your free allowance!
 
-Framework: Vite
-Build command: `npm install && npm run build`
-Output directory: `dist`
+1. Go to [UptimeRobot.com](https://uptimerobot.com) and sign in.
+2. Click **+ Add New Monitor**.
+3. **Monitor Type**: `HTTP(s)`
+4. **Friendly Name**: `Play Together Health`
+5. **URL (or IP)**: `https://play-together-backend.onrender.com/health`
+6. **Monitoring Interval**: `Every 10 minutes` (or `Every 14 minutes`; Render sleeps after 15 minutes of inactivity).
+7. Click **Create Monitor**.
 
-Add these environment variables:
+---
+
+## 4) Deploy the Frontend on Vercel
+
+1. Import the repository into Vercel.
+2. Set the **Root Directory** to `client`.
+3. Framework: **Vite**
+4. Build command: `npm install && npm run build`
+5. Output directory: `dist`
+6. Add these environment variables (both point to your single Render URL):
 
 ```env
-VITE_API_URL=https://play-together-api.onrender.com
-VITE_MEDIA_URL=https://play-together-media.onrender.com
+VITE_API_URL=https://play-together-backend.onrender.com
+VITE_MEDIA_URL=https://play-together-backend.onrender.com
 ```
 
-## 6) Production verification
+7. Click **Deploy**.
 
-After deployment, verify all services respond:
+---
 
-- API health: `https://your-api-url/health`
-- Media service root: `https://your-media-url/`
-- Frontend homepage loads in Vercel
+## 5) Production Verification
 
-## 7) Notes
+After deployment, verify everything works:
 
-- Do not put `SUPABASE_SERVICE_ROLE_KEY` into the client app.
-- The media server needs a public URL because the browser connects to it directly.
-- The API and media services should be deployed as separate services because they are independent Node apps.
-- **Render Free-Tier Spin-Down:** Render free web services automatically go to sleep after 15 minutes of inactivity. When creating a room or making the initial connection after an idle period, the first request may take around 10 to 20 seconds while the instance spins up.
+- Backend Health Check: `https://play-together-backend.onrender.com/health`
+  - Should return: `{"ok":true,"service":"play-together-unified",...}`
+- Room Validation API: `https://play-together-backend.onrender.com/api/rooms/TEST/exists`
+- Frontend loads on Vercel and can create/join rooms and stream media over WebSockets.
+
+---
+
+## 6) Important Notes
+
+- **Single Service Advantage**: Running both REST API and Socket.IO in a single service prevents out-of-sync room states and fits within Render's 750 hours/month free quota.
+- **Ephemeral Storage**: Uploaded media files in `media/` are stored on Render's ephemeral disk. If the server restarts or is redeployed, uploaded files reset. For persistent files across redeploys, consider integrating Cloudflare R2 or Supabase Storage.
+
 

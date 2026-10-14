@@ -60,6 +60,83 @@ app.use((req, res, next) => {
     next();
 });
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// In-memory store for rooms
+const inMemoryRooms = new Map();
+
+function normalizeRoomId(value) {
+    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function generateRoomId() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let id = "";
+    for (let i = 0; i < 6; i += 1) {
+        id += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return id;
+}
+
+// Health check endpoint for UptimeRobot / ping monitoring
+app.get("/health", (_req, res) => {
+    res.json({ ok: true, service: "play-together-unified", timestamp: Date.now() });
+});
+
+// REST API for room creation
+app.post("/api/rooms/create", (req, res) => {
+    try {
+        let roomId = normalizeRoomId(req.body?.roomId);
+        const hostId = String(req.body?.hostId || "host");
+
+        if (!roomId) {
+            roomId = generateRoomId();
+        }
+
+        if (!/^[A-Z0-9]{4,10}$/.test(roomId)) {
+            return res.status(400).json({ error: "Invalid room ID format." });
+        }
+
+        if (inMemoryRooms.has(roomId) || roomStates.has(roomId)) {
+            return res.status(409).json({ error: "Room ID already exists." });
+        }
+
+        inMemoryRooms.set(roomId, {
+            id: roomId,
+            host_id: hostId,
+            is_active: true,
+            participant_count: 1,
+            createdAt: Date.now()
+        });
+
+        res.status(201).json({ success: true, roomId });
+    } catch (error) {
+        console.error("Create room error:", error);
+        res.status(500).json({ error: "Failed to create room." });
+    }
+});
+
+// REST API for checking if room exists
+app.get("/api/rooms/:roomId/exists", (req, res) => {
+    try {
+        const roomId = normalizeRoomId(req.params.roomId);
+
+        if (!/^[A-Z0-9]{4,10}$/.test(roomId)) {
+            return res.status(400).json({ valid: false, error: "Invalid room ID format." });
+        }
+
+        const roomData = inMemoryRooms.get(roomId);
+        const hasSocketRoom = roomStates.has(roomId);
+        const isValid = (roomData && roomData.is_active) || hasSocketRoom;
+
+        res.json({ valid: Boolean(isValid), exists: Boolean(roomData || hasSocketRoom) });
+    } catch (error) {
+        console.error("Room validation error:", error);
+        res.status(500).json({ valid: false, error: "Failed to validate room." });
+    }
+});
+
 app.use(express.static(path.join(__dirname, "../public")));
 
 app.get("/", (req, res) => {
@@ -247,6 +324,7 @@ function endRoom(roomId, roomState) {
     roomState.participants = [];
     roomState.messages = [];
     hostIds.delete(roomId);
+    inMemoryRooms.delete(roomId);
 }
 
 io.on("connection", socket => {
