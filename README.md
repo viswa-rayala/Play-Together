@@ -1,6 +1,29 @@
 # Play Together 🎬🎧
 
-Play Together is a fullstack web application for synchronized, multi-device media rooms. A host creates a room, shares a 6-character room ID, and friends can join for frame-accurate synchronized audio/video playback, real-time chat, playlist queueing, and peer-to-peer WebRTC video calls — all without requiring an account or login.
+<p align="center">
+  <a href="https://playtogethr.vercel.app"><img src="https://img.shields.io/badge/Live%20Demo-playtogethr.vercel.app-6366f1?style=for-the-badge&logo=vercel" alt="Live Demo" /></a>
+  <a href="https://github.com/viswa-rayala/Play-Together"><img src="https://img.shields.io/badge/GitHub-viswa--rayala%2FPlay--Together-black?style=for-the-badge&logo=github" alt="GitHub Repo" /></a>
+  <a href="https://github.com/viswa-rayala/Play-Together/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge" alt="PRs Welcome" /></a>
+  <img src="https://img.shields.io/badge/License-ISC-blue.svg?style=for-the-badge" alt="License" />
+</p>
+
+Play Together is an open-source, fullstack web application for synchronized, multi-device media rooms. A host creates a room, shares a 6-character room ID, and friends can join for frame-accurate synchronized audio/video playback, real-time chat, playlist queueing, and peer-to-peer WebRTC video calls — all without requiring an account or login.
+
+🔗 **Live Application**: [https://playtogethr.vercel.app](https://playtogethr.vercel.app)  
+🐙 **GitHub Repository**: [https://github.com/viswa-rayala/Play-Together](https://github.com/viswa-rayala/Play-Together)  
+⚙️ **Backend Service (Render)**: [https://play-together-media.onrender.com](https://play-together-media.onrender.com)
+
+---
+
+## 🤝 Contributions Welcome!
+
+We welcome contributions from developers of all skill levels! Whether you want to:
+- 🐛 Fix a bug or edge-case sync issue
+- ✨ Add a new feature (e.g. YouTube stream sync, room passwords, reactions)
+- 🎨 Enhance the UI/UX or mobile responsiveness
+- 📝 Improve documentation or write tests
+
+Please feel free to fork the repository, open an issue, or submit a Pull Request! Check out our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
 
 ---
 
@@ -50,7 +73,7 @@ Play-Together/
 ├── client/                      # Frontend Application (React + Vite)
 │   ├── public/                  # Public assets (favicons, manifests)
 │   ├── src/
-│   │   ├── assets/              # Icons, badges, and SVG illustrations
+│   │   ├── assets/              # Icons, badges, and illustrations
 │   │   ├── components/          # Reusable UI widgets
 │   │   │   ├── AdminControls.jsx    # Host/co-host media upload & queue manager
 │   │   │   ├── ChatBox.jsx          # Real-time room chat component
@@ -99,6 +122,8 @@ Play-Together/
 │   ├── schema.sql               # PostgreSQL tables, indexes & RLS policies
 │   └── README.md                # Supabase database setup instructions
 │
+├── .github/                     # GitHub Issue & PR Templates
+├── CONTRIBUTING.md              # Open source contribution guide
 ├── render.yaml                  # Infrastructure-as-code for Render deployment
 ├── DEPLOYMENT.md                # Production guide (Render + Vercel + UptimeRobot)
 └── package.json                 # Monorepo root scripts & dev orchestration
@@ -241,6 +266,17 @@ Range: bytes=0-1048576
 
 ---
 
+## 🗺️ Roadmap & Future Ideas
+
+Contributions are welcome for any of these upcoming milestones:
+- [ ] **YouTube / Streaming URL Integration**: Sync streaming videos directly from YouTube/Vimeo links.
+- [ ] **Room Passwords / PINs**: Optional room password protection for private hangouts.
+- [ ] **Floating Emojis & Soundboard**: Interactive live sound effects and floating emoji bursts.
+- [ ] **Cloud Storage Adapters**: Integrations for Cloudflare R2 / AWS S3 for persistent cloud uploads.
+- [ ] **Progressive Web App (PWA)**: Installable app shell with offline cache.
+
+---
+
 ## 📦 Production Deployment
 
 The project is structured to deploy on:
@@ -254,4 +290,4 @@ See **[DEPLOYMENT.md](DEPLOYMENT.md)** for step-by-step instructions.
 
 ## 📄 License
 
-ISC License. Built for seamless shared media experiences.
+This project is open-source under the [ISC License](LICENSE). Built with ❤️ for seamless shared media experiences.
