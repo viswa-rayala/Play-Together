@@ -4,20 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node src/mediaServer.cjs",
-    "dev": "concurrently \"npm run media:dev\" \"npm --prefix client run dev -- --host 0.0.0.0\"",
-    "dev:all": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev -- --host 0.0.0.0\" \"npm run media:dev\"",
-    "media:dev": "node --watch src/mediaServer.cjs",
-    "media:prod": "node src/mediaServer.cjs",
-    "server:prod": "node src/mediaServer.cjs",
-    "install:all": "npm install && npm --prefix client install && npm --prefix server install",
+    "start": "node server/src/server.js",
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev -- --host 0.0.0.0\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev -- --host 0.0.0.0",
+    "media:dev": "node --watch server/src/server.js",
+    "media:prod": "node server/src/server.js",
+    "server:prod": "node server/src/server.js",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
     "build": "npm --prefix client run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
     "express": "^5.2.1",
-    "socket.io": "^4.8.3",
-    "multer": "^2.4.0"
+    "multer": "^2.4.0",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
