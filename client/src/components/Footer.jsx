@@ -8,8 +8,7 @@ function Footer() {
           &copy; {new Date().getFullYear()} Play Together. Built for seamless media sharing.
         </p>
         <div className="footer-links">
-          <a href="#" className="footer-link">GitHub</a>
-          <a href="#" className="footer-link">Twitter</a>
+          <a href="https://github.com/viswa-rayala/Play-Together" className="footer-link">GitHub</a>
         </div>
       </div>
     </footer>
