@@ -15,7 +15,6 @@ export const PORT = Number(process.env.PORT || 3000);
 
 // Use root media/ directory to preserve uploaded files
 export const MEDIA_DIR = process.env.MEDIA_DIR || path.join(ROOT_DIR, 'media');
-export const PUBLIC_DIR = process.env.PUBLIC_DIR || path.join(ROOT_DIR, 'public');
 
 export const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
